@@ -44,12 +44,11 @@ npx yt-briefing init      # or: bunx yt-briefing init
 ```
 
 `init` asks for your language, your keys, the channels to follow, and which agent runs `/yt`.
-No build step.
 
 ## Run it
 
 Open your project in **Claude Code** or **Cursor** and run **`/yt`**. Not listed? Start a fresh
-session. To (re)install the skill for another agent or project: `yt-briefing install-skill`.
+session. To (re)install the skill for another tool or project: `npx yt-briefing install-skill`.
 
 ## Providers
 
