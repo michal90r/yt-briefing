@@ -1,19 +1,7 @@
 ---
 name: yt
-description: Briefing from the YouTube channels you follow. The engine `src/yt-sweep.ts` sweeps the channels, filters videos in two stages (title → transcript+content), and lazily yields one video to rate per call. This skill is a thin loop: it shows the summary and collects the rating (AskUserQuestion → `yt-rating.ts`), which writes durable signal straight into the channel profile (no consolidation step). Summaries and the rating question are in the language set at onboarding (`data/config.json` → `output_lang`).
+description: Briefing from the YouTube channels you follow — the engine sweeps each channel, filters videos in two stages (title, then transcript+content), and lazily yields one video to rate per call. This skill is a thin loop that shows the summary and collects the rating (via AskUserQuestion), which writes durable signal straight into the channel profile. Summaries and the rating question use the language chosen at onboarding.
 ---
-
-## Prerequisites (first run)
-
-This skill drives the loop; it does not configure anything. Before the first run the user must onboard once, from the package directory:
-
-```
-bun run init
-```
-
-That wizard asks for the **output language**, the **LLM + YouTube keys** (`.env`), and the **channels** to follow with **what to pay attention to** in each. If `data/channels.md` or `.env` is missing, stop and tell the user to run `bun run init` — do not invent config.
-
-Run this skill from the package root (so `bun run …` resolves the scripts and `.env`).
 
 ## How it works
 
