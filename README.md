@@ -1,21 +1,15 @@
 # yt-briefing
 
-A briefing tool for the YouTube channels you follow. It sweeps each channel, filters videos
-in **two stages** (title first, then the transcript), summarizes what's left **in your
-language**, and hands you one video at a time to rate. Ratings are written back into
-per-channel profiles, so the next sweep filters tighter.
+**Save hours on YouTube.** yt-briefing watches the channels you follow so you don't have to —
+it turns each new video into a short, readable summary in your own language that keeps
+everything that matters and drops the filler. Reading it takes a fraction of the time the
+video would, so you stay on top of everything and only ever press play on what's genuinely
+worth it.
 
-Provider-agnostic (any OpenAI-compatible LLM endpoint), runtime-agnostic (**Node ≥ 18 or
-Bun**, any package manager), and no hard dependency on a coding agent — a CLI and a reference
-skill drive the same engine.
-
-```
-channel uploads ──► title filter ──► transcript ──► content filter ──► summary ──► you rate
-   (YT Data API)     (cheap LLM,       (yt-dlp,       (LLM, substance      (your lang)   │
-                      keep-by-default)   proxy-aware)   check + summary)                  │
-        ▲                                                                                 │
-        └───────────────  profile learns from rating=0 / comments  ◄─────────────────────┘
-```
+And it gets sharper the more you use it. Each summary takes a one-tap rating — *worth my time*
+or *not* — and from those it learns what to keep putting in front of you and what to quietly
+leave out. Over time the queue becomes **yours**: less noise, only the things you actually
+care about.
 
 ## Why two filters
 
