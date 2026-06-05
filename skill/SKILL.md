@@ -1,5 +1,5 @@
 ---
-name: yt-briefing
+name: yt
 description: Briefing from the YouTube channels you follow. The engine `src/yt-sweep.ts` sweeps the channels, filters videos in two stages (title → transcript+content), and lazily yields one video to rate per call. This skill is a thin loop: it shows the summary and collects the rating (AskUserQuestion → `yt-rating.ts`), which writes durable signal straight into the channel profile (no consolidation step). Summaries and the rating question are in the language set at onboarding (`data/config.json` → `output_lang`).
 ---
 

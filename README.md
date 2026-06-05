@@ -166,7 +166,8 @@ yt-briefing rate --rating 0    # record a rating for the pending video
 ### As a reference skill (Claude Code & co.)
 
 Copy [`skill/SKILL.md`](./skill/SKILL.md) into your agent's skills directory as
-`yt-briefing/SKILL.md`, open this package as the working directory, and run `/yt-briefing`.
+`yt/SKILL.md`, open this package as the working directory, and run **`/yt`** (the skill's
+command is `/yt` — short by design; the `yt-briefing` name is only the package/CLI).
 The skill is a thin loop around the same scripts: it pastes each summary, collects your
 rating in one popup (in your configured language), and writes it back. This is the primary,
 most pleasant way to use the tool.

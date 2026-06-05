@@ -219,7 +219,7 @@ function main(): void {
   console.log(`    ${CHANNELS_MD}`);
   console.log(`    ${STATE_MD}`);
   console.log(`    ${channels.length} profile(s) in ${CHANNELS_DIR}/`);
-  console.log('\n  Next: run a sweep —  bun run sweep --reset   (or use the /yt-briefing skill).\n');
+  console.log('\n  Next: run a sweep —  bun run sweep --reset   (or use the /yt skill).\n');
 }
 
 try { main(); } catch (err) { console.error(err); process.exit(1); }
