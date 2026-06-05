@@ -70,8 +70,14 @@ OpenAI (`https://api.openai.com/v1`), or a local Ollama (`http://localhost:11434
 
 ## Sync across machines
 
-Point `YT_DATA_DIR` at a private git repo and commit after each rating — full recipe in
+Your state is plain files in `.yt-briefing/data/` — version that folder (or point `YT_DATA_DIR`
+at a separate private repo) and commit after each rating. Recipe:
 [docs/sync-across-machines.md](./docs/sync-across-machines.md).
+
+## Running on a VPS
+
+YouTube blocks datacenter IPs, so transcript fetches fail on most servers. Route them through a
+free Cloudflare WARP proxy — see [docs/warp-proxy.md](./docs/warp-proxy.md).
 
 ## License
 

@@ -41,8 +41,8 @@ either; we use HTTP.
 YT_PROXY=http://127.0.0.1:1080
 ```
 
-`src/yt-transcript.ts` reads `YT_PROXY` and routes all yt-dlp traffic through it. No env
-var → direct fetch (the residential default).
+yt-briefing reads `YT_PROXY` and routes all yt-dlp traffic through it. No env var → direct
+fetch (the residential default).
 
 ### Health check
 

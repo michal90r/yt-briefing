@@ -15,13 +15,18 @@ silently lost when machine B pushed first.
 
 ---
 
-## 1. Put the data dir in its own git repo
+## 1. Version your state
 
-Point `YT_DATA_DIR` at a folder you control and version *that* (keeping it separate from
-the package source — which ignores `data/` on purpose):
+Your state already lives in plain files at **`<your project>/.yt-briefing/data/`** — right
+inside the project you ran `init` from. So the simplest sync is to **version that folder** in
+your project's own git: push from machine A, pull on machine B. Keep `.yt-briefing/.env`
+git-ignored — secrets stay per machine.
+
+Want briefing state in **its own** repo instead (e.g. a laptop and a headless VPS that share
+nothing else)? Point `YT_DATA_DIR` at a folder you control and version that:
 
 ```bash
-# .env  (per machine)
+# .env  (per machine — secrets never sync)
 YT_DATA_DIR=/home/you/yt-briefing-data
 ```
 
@@ -29,16 +34,11 @@ YT_DATA_DIR=/home/you/yt-briefing-data
 cd /home/you/yt-briefing-data
 git init && git remote add origin git@github.com:you/yt-briefing-data.git   # a PRIVATE repo
 printf '.cache/\n' > .gitignore          # never commit the throwaway session cache
-bun run init                              # onboard into this folder (or move an existing data/ here)
+npx yt-briefing init                     # onboard into this folder (or move existing data here)
 git add -A && git commit -m "initial" && git push -u origin main
 ```
 
-On the **second** machine: clone that repo, set the same `YT_DATA_DIR`, drop in your `.env`,
-and you're sharing one state.
-
-> Prefer not to move anything? You can instead `git init` *inside* the default `data/`
-> folder — a nested repo is independent of the package's own `.gitignore`. Just add the same
-> `.cache/` ignore there.
+On the second machine: clone that repo, set the same `YT_DATA_DIR`, drop in your `.env`.
 
 ---
 
@@ -71,7 +71,7 @@ Save as `yt-sync.sh` (anywhere), `chmod +x`:
 #!/usr/bin/env bash
 # Persist yt-briefing state to git, sync-safe across machines. Best-effort, never blocks.
 set -uo pipefail
-DATA="${YT_DATA_DIR:?set YT_DATA_DIR to your git-tracked data folder}"
+DATA="${YT_DATA_DIR:-$PWD/.yt-briefing/data}"   # the folder you version (default: in-project)
 cd "$DATA" || exit 0
 
 git add channels.md state.md channels/ config.json 2>/dev/null || exit 0
@@ -99,7 +99,7 @@ the engine runs. In Claude Code's `settings.json`:
   "hooks": {
     "PostToolUse": [
       { "matcher": "Bash",
-        "hooks": [ { "type": "command", "command": "cmd=$(jq -r '.tool_input.command // \"\"'); case \"$cmd\" in *yt-rating.ts*|*yt-sweep.ts*) /path/to/yt-sync.sh ;; esac" } ] }
+        "hooks": [ { "type": "command", "command": "cmd=$(jq -r '.tool_input.command // \"\"'); case \"$cmd\" in *yt-rating*|*yt-sweep*) /path/to/yt-sync.sh ;; esac" } ] }
     ]
   }
 }
@@ -113,7 +113,7 @@ yt-briefing rate --rating 0 && /path/to/yt-sync.sh
 
 > Optional but recommended: also `git pull --rebase` **before** the first sweep of a session
 > (so a machine starts on the latest cursor), e.g. a `PreToolUse` hook matching
-> `*yt-sweep.ts*--reset*`, or just `cd "$YT_DATA_DIR" && git pull --rebase` before you start.
+> `*yt-sweep*--reset*`, or just `cd "$YT_DATA_DIR" && git pull --rebase` before you start.
 
 ---
 
