@@ -13,8 +13,10 @@ care about.
 
 ## Setup
 
-You'll need **Node ≥ 18 or Bun**, a **YouTube Data API v3 key**, and an **LLM key** (a
-[free Gemini key](https://aistudio.google.com/apikey) works — see [Providers](#providers)).
+You'll need **Node ≥ 18 or Bun**, a **YouTube Data API v3 key**, an **LLM key** (a
+[free Gemini key](https://aistudio.google.com/apikey) works — see [Providers](#providers)), and
+your favorite tool for running **skills** — **[Claude Code](https://claude.com/claude-code)**,
+**[Cursor](https://cursor.com)**, or another that loads `SKILL.md`.
 
 **1. Install yt-dlp** (it pulls the subtitles):
 
