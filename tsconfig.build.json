@@ -1,0 +1,17 @@
+{
+  // Emit config for publishing: compiles src/ → dist/ as runnable Node ESM (.js with explicit
+  // extensions), so the package runs under plain Node (any package manager) as well as Bun.
+  // Day-to-day dev still runs the TypeScript in src/ directly via Bun; this is only for builds.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    // TS 5.7+: rewrites relative `./x.ts` import specifiers to `./x.js` in the emitted JS, so
+    // Node ESM resolves them. Required to emit while `allowImportingTsExtensions` is on.
+    "rewriteRelativeImportExtensions": true,
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["src/**/*.ts"]
+}

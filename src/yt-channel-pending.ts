@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Usage: bun src/yt-channel-pending.ts @HANDLE
  *
@@ -30,7 +30,7 @@ interface PendingVideo {
 
 const handle = process.argv[2];
 if (!handle) {
-  console.error('Usage: bun yt-channel-pending.ts @HANDLE');
+  console.error('Usage: yt-channel-pending @HANDLE   (internal helper)');
   process.exit(1);
 }
 

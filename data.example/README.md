@@ -6,7 +6,7 @@ reference for the shape of that data, and a home for the channel-profile templat
 ```
 data/
 ├── config.json          { "output_lang": "English" }   ← your summary/rating language
-├── channels.md          categories + base policies + channel list
+├── channels.md          the channels you follow (a flat list)
 ├── state.md             per-channel per-type cursor (last video seen of each type)
 ├── channels/
 │   ├── _template.md     the profile section template (see this folder)

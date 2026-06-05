@@ -1,0 +1,7 @@
+# Copy this into your *data* repo (the folder YT_DATA_DIR points at) if you sync state
+# across machines. See docs/sync-across-machines.md.
+#
+# Channel profiles are append-only logs (ratings → ## Skip titles / ## Notes). Union merge
+# keeps BOTH machines' additions instead of conflicting. state.md is intentionally NOT
+# union-merged (it's a table — union would garble rows; a real collision should surface).
+channels/*.md merge=union

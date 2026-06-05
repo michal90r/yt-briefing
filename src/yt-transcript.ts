@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Usage: bun src/yt-transcript.ts VIDEO_ID_OR_URL [--lang pl|en|auto]
  * Accepts: bare 11-char video ID, youtube.com/watch?v=..., or youtu.be/... URL.
@@ -23,10 +23,15 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
+import { CACHE_DIR, ENV_PATH } from './lib/paths.ts';
+
+// Load .env so YT_PROXY is set when run standalone under Node (Bun auto-loads it; Node doesn't).
+// When spawned by yt-sweep, the parent already loaded it and the child inherits the env.
+dotenv.config({ path: ENV_PATH });
 
 /** Resolve the yt-dlp binary: explicit env → project-local ./bin → PATH (Windows-aware). */
 function resolveYtDlp(): string {
@@ -43,7 +48,7 @@ const langIdx = args.indexOf('--lang');
 const preferredLang = langIdx !== -1 ? args[langIdx + 1]! : 'auto';
 
 if (!rawInput) {
-  console.error('Usage: bun yt-transcript.ts VIDEO_ID_OR_URL [--lang pl|en|auto]');
+  console.error('Usage: yt-briefing transcribe VIDEO_ID_OR_URL [--lang pl|en|auto]');
   process.exit(3);
 }
 
@@ -77,7 +82,10 @@ function vttToText(vtt: string): string {
   return parts.join(' ');
 }
 
-const tmpDir = mkdtempSync(join(tmpdir(), 'yt-'));
+// Keep yt-dlp's scratch subtitles inside the gitignored data cache — never OS /tmp, so all
+// of the tool's transient files stay in-repo (DATA_DIR/.cache). Cleaned up below.
+mkdirSync(CACHE_DIR, { recursive: true });
+const tmpDir = mkdtempSync(join(CACHE_DIR, 'sub-'));
 const outTemplate = join(tmpDir, 'sub');
 const subLangs = preferredLang === 'auto' ? 'pl,en,en-orig,en.*' : `${preferredLang},en,pl`;
 

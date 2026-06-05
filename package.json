@@ -4,16 +4,28 @@
   "description": "A self-learning YouTube briefing engine: it sweeps the channels you follow, filters noise in two stages (title, then transcript), summarizes the rest in your language, and adapts to your ratings — one video at a time.",
   "type": "module",
   "bin": {
-    "yt-briefing": "./src/cli.ts"
+    "yt-briefing": "./dist/cli.js"
   },
+  "files": [
+    "dist",
+    "data.example",
+    ".claude/skills",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "bun run build",
     "init": "bun run src/bootstrap.ts",
+    "install-skill": "bun run src/install-skill.ts",
     "sweep": "bun run src/yt-sweep.ts",
     "rate": "bun run src/yt-rating.ts",
     "transcribe": "bun run src/yt-transcript.ts",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
+    "node": ">=18",
     "bun": ">=1.0.0"
   },
   "keywords": [
@@ -32,6 +44,8 @@
   },
   "devDependencies": {
     "@types/node": "^22",
-    "typescript": "^5.6"
-  }
+    "typescript": "^5.7",
+    "@types/bun": "latest"
+  },
+  "private": true
 }

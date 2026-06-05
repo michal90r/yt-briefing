@@ -18,8 +18,6 @@ type: yt-channel-profile
 name: <slug>-profile
 channel: @Handle
 channel_url: https://www.youtube.com/@Handle
-category: <category-slug>
-description: <one line>
 updated: YYYY-MM-DD
 sessions_observed: <int>
 ---
@@ -29,7 +27,7 @@ Optional sections. **A section exists ⟺ it has content.** Don't create empty p
 
 | Section | Function | Source |
 |---|---|---|
-| `## Channel policy` | Per-channel base policy (narrows / sharpens the category one). Short, conceptual — *what to pay attention to here.* | By hand (set at onboarding) |
+| `## Channel policy` | Per-channel base policy — short, conceptual: *what to pay attention to on this channel.* | By hand (optional) |
 | `## Summary format` | Deviation from the default (numbered thematic sections). Use it when a channel needs a different style (headline-only, "what it was about", per-segment digest). | By hand |
 | `## Episode types` | Taxonomy of formats (solo / interview / report / multi-segment). Steers summary style per type. | By hand |
 | `## Skip titles` | **Negative** few-shots for the title filter (keep-by-default; learn only what to drop). FIFO cap 10. Format: `- "<title>" — <type>`. | `yt-rating.ts` on `rating=0` |

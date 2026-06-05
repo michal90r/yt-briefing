@@ -1,14 +1,13 @@
 # yt-briefing
 
-A self-learning briefing for the YouTube channels you follow. It sweeps each channel,
-drops the noise in **two stages** (title first, then the actual transcript), summarizes
-what's left **in your language**, and hands you one video at a time to rate. Your ratings
-are written straight back into per-channel profiles, so the next sweep filters more like
-you would. No feed, no algorithm — a queue that gets quieter the more you use it.
+A briefing tool for the YouTube channels you follow. It sweeps each channel, filters videos
+in **two stages** (title first, then the transcript), summarizes what's left **in your
+language**, and hands you one video at a time to rate. Ratings are written back into
+per-channel profiles, so the next sweep filters tighter.
 
-It is **provider-agnostic** (any OpenAI-compatible LLM endpoint) and has **no hard
-dependency on any coding agent** — there's a CLI and a reference skill, and the core is
-just a handful of Bun scripts.
+Provider-agnostic (any OpenAI-compatible LLM endpoint), runtime-agnostic (**Node ≥ 18 or
+Bun**, any package manager), and no hard dependency on a coding agent — a CLI and a reference
+skill drive the same engine.
 
 ```
 channel uploads ──► title filter ──► transcript ──► content filter ──► summary ──► you rate
@@ -42,7 +41,8 @@ plain Markdown you can also edit by hand.
 
 ## Requirements
 
-- [**Bun**](https://bun.sh) ≥ 1.0
+- A JavaScript runtime: **[Node.js](https://nodejs.org) ≥ 18** *or* **[Bun](https://bun.sh) ≥ 1.0**
+  (install the package with any manager — npm, pnpm, yarn, or bun).
 - [**yt-dlp**](https://github.com/yt-dlp/yt-dlp) — extracts the subtitles. See the install
   table below.
 - An **OpenAI-compatible LLM key** — a [free Gemini key](https://aistudio.google.com/apikey)
@@ -74,39 +74,34 @@ Keep it current — YouTube changes often and yt-dlp ships fixes fast:
 yt-dlp -U
 ```
 
-#### Prefer a project-local copy? (no global install)
-
-If you'd rather not touch your global `PATH`, drop a standalone yt-dlp binary into this
-package's `bin/` (gitignored) — the tool checks there before `PATH`. Pick the build for
-your OS from the [latest release](https://github.com/yt-dlp/yt-dlp/releases/latest):
-
-| OS / arch | Asset | Save as |
-|-----------|-------|---------|
-| macOS | `yt-dlp_macos` | `bin/yt-dlp` (`chmod +x`) |
-| Linux x64 | `yt-dlp_linux` | `bin/yt-dlp` (`chmod +x`) |
-| Linux arm64 | `yt-dlp_linux_aarch64` | `bin/yt-dlp` (`chmod +x`) |
-| Windows | `yt-dlp.exe` | `bin\yt-dlp.exe` |
-
-These are self-contained (no Python needed). Or point `YT_DLP_PATH` at an existing binary
-anywhere — the lookup order is `YT_DLP_PATH` → `bin/yt-dlp` → `PATH`.
-
 ## Setup
 
 ```bash
-bun install
-bun run init     # interactive onboarding
+bun add yt-briefing        # or:  npm i yt-briefing  ·  pnpm add yt-briefing  ·  yarn add yt-briefing
+bunx yt-briefing init      # interactive onboarding   (npm: npx yt-briefing init)
 ```
 
-`bun run init` asks for, and writes:
+**No build step** — the package ships ready to run; `init` works under whatever runtime you
+have (Node or Bun). Run it **from your project's root**: your keys and state go to
+**`<your project>/.yt-briefing/`**, *not* into `node_modules` — so they survive `bun update` /
+`npm update`.
 
-1. **Output language** for summaries and ratings → `data/config.json`.
-2. **LLM + YouTube keys** (and optional proxy) → `.env`.
-3. **The channels you follow** — each one's `@handle`, a **category**, and **what to pay
-   attention to** in it → `data/channels.md`, `data/state.md`, and a profile per channel.
+`init` walks you through, and writes into `.yt-briefing/`:
 
-Everything it writes is plain Markdown / JSON under `data/` — see
-[`data.example/`](./data.example/) for the layout and the profile template. Add or tune
-channels later by editing those files; the filters pick up changes on the next sweep.
+1. **Output language** for summaries and ratings → `.yt-briefing/data/config.json`.
+2. **LLM + YouTube keys** (and optional proxy) → `.yt-briefing/.env`.
+3. **The channels you follow** — just a **list**. Paste each in whatever form you have —
+   `@betterstack`, `betterstack`, or the full URL `https://www.youtube.com/@betterstack`
+   (the URL works as-is — it reads the handle for you); empty line to finish. **No rules to
+   define up front** — each channel's profile *learns* what to skip from your ratings as you
+   watch (`## Skip titles` / `## Notes`).
+4. **Which agent runs `/yt`** — pick Claude Code or Cursor and it installs the skill **into
+   your project** (`.claude/skills/yt` or `.cursor/skills/yt`), or **Custom folder** for any
+   other agent. No machine-wide global install.
+
+Everything it writes is plain Markdown / JSON under `.yt-briefing/data/`. Add or remove
+channels later by editing `.yt-briefing/data/channels.md` (a flat list); the filters pick up
+changes on the next sweep.
 
 ## Choosing a provider
 
@@ -123,6 +118,12 @@ one key.
 > [Google AI Studio](https://aistudio.google.com/apikey) and use the *Gemini, direct*
 > block below. The free tier is rate-limited but comfortably covers a personal daily
 > sweep. No OpenRouter account, no card.
+>
+> **Heads-up — the free tier shares capacity.** On a free Gemini key you may occasionally
+> get a *"the model is overloaded / high demand"* error (HTTP 429/503) when Google's shared
+> free pool is busy. Just retry in a moment. If it keeps happening, switch to a **paid** key
+> (enable billing in Google AI Studio, same `LLM_MODEL`) — paid requests don't hit that pool,
+> so the error goes away.
 
 ```ini
 # Gemini, direct (Google's OpenAI-compatible endpoint) — works with a FREE AI Studio key
@@ -153,9 +154,9 @@ Local models work too — point `LLM_BASE_URL` at a running Ollama
 ### As a CLI
 
 ```bash
-yt-briefing sweep --reset      # advance one step → prints a JSON status line
-yt-briefing rate --rating 0    # record a rating for the pending video
-# (or: bun run sweep --reset / bun run rate --rating 0)
+bunx yt-briefing sweep --reset      # advance one step → prints a JSON status line
+bunx yt-briefing rate --rating 0    # record a rating for the pending video
+# npm:  npx yt-briefing sweep --reset   ·   npx yt-briefing rate --rating 0
 ```
 
 `sweep` prints one of:
@@ -163,30 +164,53 @@ yt-briefing rate --rating 0    # record a rating for the pending video
 - `{"status":"done"}` — nothing left.
 - `{"status":"rate_limited"}` — transcript fetch blocked (usually a datacenter IP — see [the proxy guide](./docs/warp-proxy.md)).
 
-### As a reference skill (Claude Code & co.)
+### As a skill (Claude Code & Cursor)
 
-Copy [`skill/SKILL.md`](./skill/SKILL.md) into your agent's skills directory as
-`yt/SKILL.md`, open this package as the working directory, and run **`/yt`** (the skill's
-command is `/yt` — short by design; the `yt-briefing` name is only the package/CLI).
-The skill is a thin loop around the same scripts: it pastes each summary, collects your
-rating in one popup (in your configured language), and writes it back. This is the primary,
-most pleasant way to use the tool.
+The skill is **not a program** — it's a Markdown instruction file your **coding agent reads
+and follows**, driving the same CLI under the hood. `init` (step 4) installs it into your
+project for the agent you pick. Both **[Claude Code](https://claude.com/claude-code)** and
+**[Cursor](https://cursor.com)** (2.4+) load `SKILL.md` skills and invoke them as `/yt`.
+
+1. Open **your project** (where you ran `init`) in Claude Code or Cursor.
+2. Make sure onboarding is done (`init`) and [Requirements](#requirements) are met
+   (Node or Bun, yt-dlp, an LLM key, a YouTube key).
+3. Start a session and run **`/yt`**. (Short by design; `yt-briefing` is only the CLI name.)
+
+Skills are scanned at session start, so if `/yt` isn't listed, **start a fresh session**. To
+(re)install it — for Cursor's `.cursor/skills/`, another project, or a second agent — run
+**`yt-briefing install-skill`**: pick the agent and the project. It's always **project-scoped
+— no machine-wide global install**. The skill shows each summary and takes your rating in one
+step (a popup in Claude Code, a chat question in Cursor), then writes it back.
+
+> Other agents without a skill system: use the **CLI** — `yt-briefing sweep` / `rate` drive
+> the exact same engine and ratings. Nothing about the tool *requires* an agent.
+
+## Sync across machines (multi-device)
+
+All your state is plain files in the data dir (`channels.md`, `state.md`, and the per-channel
+profiles where ratings accumulate). The engine never touches git, so syncing two machines
+(e.g. a laptop + a VPS / remote session) is just *"version the data dir and commit after each
+rating."* Point `YT_DATA_DIR` at a **private git repo**, add a `.gitattributes` so profiles
+**union-merge** (both machines' ratings kept), and wire a small hook that commits → pushes →
+and on a rejected push **rebases and retries** instead of silently dropping a rating.
+
+Full recipe — repo setup, the ready-to-copy `yt-sync.sh` hook (agent `PostToolUse` *or* CLI),
+and the multi-writer safety rules — is in **[docs/sync-across-machines.md](./docs/sync-across-machines.md)**.
+(`.env` never syncs — secrets stay per machine; the throwaway `.cache/` is ignored too.)
 
 ## Architecture notes
 
-- **One engine, lazy.** `src/yt-sweep.ts` does the whole sweep — filters, transcript,
-  summary, skips — and yields **one** ratable video per invocation. The frontend has zero
-  loop logic. For fast first paint it expands channels in **parallel waves** until it has
-  the first ratable video (a detached child expands the rest in the background), and warms
-  the *next* summary while you rate the current one.
-- **No heavy SDK.** The YouTube Data API is reached over plain `fetch` (`src/lib/yt-api.ts`),
-  not the monolithic `googleapis` package whose cold import dominated per-process startup.
-- **Quiet by default.** `src/yt-sweep.ts` prints a pure JSON line on stdout (nothing on
-  stderr), so callers never redirect to a temp file. Set `YT_DEBUG=1` for per-stage timings
-  in the gitignored `<data>/.cache/sweep.log`.
-- **Crash-safe cursor.** `data/state.md` is the only durable cursor; it's bumped per video.
-  A crash before you rate just re-surfaces that one video next run. `data/.cache/` is
-  throwaway session state.
+- **One engine, lazy.** A single sweep does the whole thing — filters, transcript, summary,
+  skips — and yields **one** ratable video per invocation. For fast first paint it expands
+  channels in **parallel waves** until it has the first ratable video (a detached child
+  expands the rest in the background), and warms the *next* summary while you rate the current.
+- **No heavy SDK.** The YouTube Data API is reached over plain `fetch`, not the monolithic
+  `googleapis` package whose cold import dominated per-process startup.
+- **Quiet by default.** The sweep prints a pure JSON line on stdout (nothing on stderr), so
+  callers never redirect to a temp file. Set `YT_DEBUG=1` for per-stage timings in the
+  gitignored `.yt-briefing/data/.cache/sweep.log`.
+- **Crash-safe cursor.** `state.md` is the only durable cursor; it's bumped per video. A crash
+  before you rate just re-surfaces that one video next run. `.cache/` is throwaway session state.
 - **One model, both stages.** The same `LLM_MODEL` classifies titles (a cheap batch call)
   and writes summaries. Gemini 2.5 Flash by default; swap it for anything via `.env`.
 - **Your data is yours.** The engine never touches git or any network beyond the LLM and

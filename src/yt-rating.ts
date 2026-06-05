@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Usage:
  *   bun src/yt-rating.ts --rating 0|1 [--comment "..."]
@@ -63,7 +63,7 @@ function parseArgs(argv: string[]): Args {
   const capRaw = getArg(argv, '--cap');
 
   if (!channel || !id || !title || !type || !ratingRaw) {
-    console.error('Usage: bun yt-rating.ts --rating 0|1 [--comment "..."]  (channel/id/title/type default to .cache/pending.json; override with --channel @X --id Y --title "..." --type longform|short|live) [--baseline] [--cap 10] [--no-state]');
+    console.error('Usage: yt-briefing rate --rating 0|1 [--comment "..."]  (channel/id/title/type default to .cache/pending.json; override with --channel @X --id Y --title "..." --type longform|short|live) [--baseline] [--cap 10] [--no-state]');
     process.exit(1);
   }
   if (!['longform', 'short', 'live'].includes(type)) {

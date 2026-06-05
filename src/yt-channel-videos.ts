@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Usage:
  *   bun src/yt-channel-videos.ts @HANDLE_OR_CHANNEL_ID --since YYYY-MM-DD
@@ -34,7 +34,7 @@ const limit: number | null = limitIdx !== -1 && args[limitIdx + 1] ? parseInt(ar
 const noEnrich = args.includes('--no-enrich');
 
 if (!handleOrId || (!since && !all)) {
-  console.error('Usage: bun yt-channel-videos.ts @HANDLE_OR_ID (--since YYYY-MM-DD | --all) [--limit N] [--no-enrich]');
+  console.error('Usage: yt-channel-videos @HANDLE_OR_ID (--since YYYY-MM-DD | --all) [--limit N] [--no-enrich]   (internal helper)');
   process.exit(1);
 }
 

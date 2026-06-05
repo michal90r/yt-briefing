@@ -11,15 +11,12 @@ export const SKIP_TITLES_HEADING = '## Skip titles';
 export const NOTES_HEADING = '## Notes';
 
 export interface ChannelEntry {
-  handle: string;       // @AsianBoss
-  category: string;     // world-and-economy
-  slug: string;         // asian-boss   (profile lives at <DATA_DIR>/channels/<slug>.md)
-  policy: string;       // base category policy text
+  handle: string;       // @BetterStack
+  slug: string;         // better-stack   (profile lives at <DATA_DIR>/channels/<slug>.md)
 }
 
 export interface StateRow {
   handle: string;
-  category: string;
   last_longform_id: string | null;
   last_short_id: string | null;
   last_live_id: string | null;
@@ -28,92 +25,39 @@ export interface StateRow {
 }
 
 const NULL_CELL = /^[—\-]$/;
+const ENTRY_RE = /^-\s*\[(@[^\]]+)\]\([^)]+\)\s*→\s*\[\[channels\/([^\]]+)\]\]/;
 
 // ---------- channels.md ----------
 
+/** A flat list of `- [@Handle](url) → [[channels/slug]]` lines under `# Channels`. */
 export function parseChannels(content: string): ChannelEntry[] {
   const entries: ChannelEntry[] = [];
-  const lines = content.split('\n');
-  let category: string | null = null;
-  let policy = '';
-  let inPolicy = false;
-  let inChannels = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
-
-    const catMatch = line.match(/^## Category:\s*(.+?)\s*$/);
-    if (catMatch) {
-      category = catMatch[1]!;
-      policy = '';
-      inPolicy = false;
-      inChannels = false;
-      continue;
-    }
-
-    if (line.trim().startsWith('**Base policy:**')) {
-      inPolicy = true;
-      inChannels = false;
-      continue;
-    }
-
-    if (line.trim() === '**Channels:**') {
-      inPolicy = false;
-      inChannels = true;
-      continue;
-    }
-
-    if (inPolicy && line.trim() && !line.startsWith('#')) {
-      policy = policy ? `${policy}\n${line.trim()}` : line.trim();
-    } else if (inPolicy && (line.startsWith('##') || line.startsWith('---'))) {
-      inPolicy = false;
-    }
-
-    if (inChannels && category) {
-      // - [@Handle](url) → [[channels/slug]]
-      const m = line.match(/^-\s*\[(@[^\]]+)\]\([^)]+\)\s*→\s*\[\[channels\/([^\]]+)\]\]/);
-      if (m) {
-        entries.push({ handle: m[1]!, category, slug: m[2]!, policy });
-      }
-    }
+  for (const line of content.split('\n')) {
+    const m = line.match(ENTRY_RE);
+    if (m) entries.push({ handle: m[1]!, slug: m[2]! });
   }
-
   return entries;
 }
 
 // ---------- state.md ----------
 
+/** One flat table; rows `| @Handle | id | id | id | date | int |`. */
 export function parseState(content: string): StateRow[] {
   const rows: StateRow[] = [];
-  const lines = content.split('\n');
-  let category: string | null = null;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
-
-    const catMatch = line.match(/^##\s+([a-z][a-z0-9-]*)\s*$/);
-    if (catMatch) {
-      category = catMatch[1]!;
-      continue;
-    }
-
-    // Table row: | @Handle | id | id | id | date | int |
-    if (line.startsWith('| @') && category) {
-      const cells = line.split('|').map(c => c.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
-      if (cells.length !== 6) continue;
-      const [handle, lf, sh, lv, updated, session] = cells as [string, string, string, string, string, string];
-      rows.push({
-        handle,
-        category,
-        last_longform_id: NULL_CELL.test(lf) ? null : lf,
-        last_short_id: NULL_CELL.test(sh) ? null : sh,
-        last_live_id: NULL_CELL.test(lv) ? null : lv,
-        updated: NULL_CELL.test(updated) ? null : updated,
-        session: NULL_CELL.test(session) ? 0 : parseInt(session, 10) || 0,
-      });
-    }
+  for (const line of content.split('\n')) {
+    if (!line.startsWith('| @')) continue;
+    const cells = line.split('|').map(c => c.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+    if (cells.length !== 6) continue;
+    const [handle, lf, sh, lv, updated, session] = cells as [string, string, string, string, string, string];
+    rows.push({
+      handle,
+      last_longform_id: NULL_CELL.test(lf) ? null : lf,
+      last_short_id: NULL_CELL.test(sh) ? null : sh,
+      last_live_id: NULL_CELL.test(lv) ? null : lv,
+      updated: NULL_CELL.test(updated) ? null : updated,
+      session: NULL_CELL.test(session) ? 0 : parseInt(session, 10) || 0,
+    });
   }
-
   return rows;
 }
 

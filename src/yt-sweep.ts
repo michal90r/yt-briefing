@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * yt-sweep.ts — lazy briefing engine. ONE invocation advances to the next video that
  * needs a rating (or reports done / rate_limited). All control flow, gate logic,
@@ -194,7 +194,7 @@ function clearPrefetch(): void {
  */
 function spawnPrefetch(next: QueueItem | undefined): void {
   if (!next) return;
-  const child = spawn(RUNTIME, [script('yt-sweep.ts'), '--prefetch', next.videoId], {
+  const child = spawn(RUNTIME, [script('yt-sweep'), '--prefetch', next.videoId], {
     cwd: PKG_ROOT,
     env: { ...process.env },
     detached: true,
@@ -230,7 +230,7 @@ function clearRest(): void {
  * queue.json / state.md). Best-effort: if it dies, the foreground expands channels itself.
  */
 function spawnBackgroundFill(): void {
-  const child = spawn(RUNTIME, [script('yt-sweep.ts'), '--fill'], {
+  const child = spawn(RUNTIME, [script('yt-sweep'), '--fill'], {
     cwd: PKG_ROOT,
     env: { ...process.env },
     detached: true,
@@ -341,7 +341,7 @@ function channelRefs(): ChannelRef[] {
  */
 async function expandChannel(ref: ChannelRef): Promise<{ items: QueueItem[]; skips: SkipRef[] }> {
   const t = Date.now();
-  const { stdout, code } = await run([RUNTIME, script('yt-channel-pending.ts'), ref.handle]);
+  const { stdout, code } = await run([RUNTIME, script('yt-channel-pending'), ref.handle]);
   log(`  pending ${ref.handle} ${Date.now() - t}ms`);
   const videos: any[] = code === 0 ? (JSON.parse(stdout || '[]') as any[]) : [];
   if (videos.length === 0) return { items: [], skips: [] };
@@ -451,7 +451,7 @@ type ItemResult =
  */
 async function processItem(item: QueueItem): Promise<ItemResult> {
   const tT = Date.now();
-  const t = await run([RUNTIME, script('yt-transcript.ts'), item.videoId, '--lang', 'auto']);
+  const t = await run([RUNTIME, script('yt-transcript'), item.videoId, '--lang', 'auto']);
   log(`transcript ${item.videoId} ${Date.now() - tT}ms (exit ${t.code})`);
   if (t.code === 2) return { kind: 'rate_limited' };
   if (t.code !== 0) return { kind: 'skip', status: 'no_transcript' };
