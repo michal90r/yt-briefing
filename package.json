@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "prepublishOnly": "bun run build",
+    "prepare": "tsc -p tsconfig.build.json",
     "init": "bun run src/bootstrap.ts",
     "install-skill": "bun run src/install-skill.ts",
     "sweep": "bun run src/yt-sweep.ts",
@@ -39,6 +39,12 @@
     "claude"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/michal90r/yt-briefing.git"
+  },
+  "homepage": "https://github.com/michal90r/yt-briefing#readme",
+  "bugs": "https://github.com/michal90r/yt-briefing/issues",
   "dependencies": {
     "dotenv": "^16.6.1"
   },
@@ -46,6 +52,5 @@
     "@types/node": "^22",
     "typescript": "^5.7",
     "@types/bun": "latest"
-  },
-  "private": true
+  }
 }
