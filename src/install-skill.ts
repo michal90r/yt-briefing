@@ -11,7 +11,7 @@
  * standalone command is for re-installing, a different project, or a second agent. There is
  * deliberately no home-global install — the skill lives with the project that uses it.
  *
- * Both Claude Code and Cursor (2.4+) load `SKILL.md` skills and invoke them as `/<name>`.
+ * Both Claude Code and Cursor load `SKILL.md` skills and invoke them as `/<name>`.
  * Cursor also reads `.claude/skills/` for compatibility, so the copy this package already
  * ships often works in both — this command just (re)places it where you want.
  */
@@ -29,7 +29,7 @@ function done(target: string): void {
 // 1) which agent → which skills subdir
 console.log('\n  Install the /yt skill — which agent?\n');
 console.log('    1) Claude Code');
-console.log('    2) Cursor   (2.4+; also reads Claude\'s .claude/skills)');
+console.log('    2) Cursor   (also reads Claude\'s .claude/skills)');
 console.log('    3) Custom folder (any other agent)\n');
 
 const agentKey = ask('  Agent', '1');
