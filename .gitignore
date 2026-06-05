@@ -1,0 +1,10 @@
+node_modules/
+.env
+bun.lock
+
+# User briefing state (default location). Yours to keep private or version yourself.
+/data/
+# If YT_DATA_DIR points elsewhere, that's your call to ignore/commit.
+
+# Throwaway session cache, wherever the data dir lives.
+.cache/
