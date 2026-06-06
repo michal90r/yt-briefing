@@ -9,6 +9,16 @@ It also gets better the more you use it. You give each summary a quick rating, w
 or not, and from that it learns what to keep showing you and what to drop. Over time the queue
 becomes yours: less noise, more of what you care about.
 
+## First run vs later
+
+On a channel's first sweep there is no history, so yt-briefing takes the latest video of each
+kind: the newest long-form, the newest short, and the newest live. That gives you a baseline
+without pulling the whole back catalog.
+
+After that it works from history. Each rating moves a per-type cursor forward, so later runs
+only surface videos newer than the ones you already handled, and a session just continues where
+the last one left off.
+
 ## Setup
 
 You'll need Node 18+ or Bun, a YouTube Data API v3 key, an LLM key (a
@@ -89,16 +99,6 @@ That pacing is deliberate. Pulling many transcripts in a quick burst looks like 
 YouTube and gets your IP rate-limited or blocked, which is easy to hit on a server. Fetching
 them at the speed you actually work through the queue keeps you under the radar and the queue
 flowing.
-
-## First run vs later
-
-On a channel's first sweep there is no history, so yt-briefing takes the latest video of each
-kind: the newest long-form, the newest short, and the newest live. That gives you a baseline
-without pulling the whole back catalog.
-
-After that it works from history. Each rating moves a per-type cursor forward, so later runs
-only surface videos newer than the ones you already handled, and a session just continues where
-the last one left off.
 
 ## Sync across machines
 
