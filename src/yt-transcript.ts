@@ -12,13 +12,13 @@
  * Uses yt-dlp for subtitle extraction (handles all YouTube caption formats).
  *
  * yt-dlp lookup (so a project-local install needs no global PATH pollution):
- *   1. $YT_DLP_PATH if set
+ *   1. $YT_BRIEFING_DLP_PATH if set
  *   2. <package>/bin/yt-dlp  (yt-dlp.exe on Windows) if present
  *   3. `yt-dlp` on PATH       (yt-dlp.exe on Windows)
  * See README.md → Requirements for per-OS install methods.
  *
- * YT_PROXY env (optional): HTTP proxy URL — required on datacenter/VPS IPs which
- *   YouTube blocks. Example: YT_PROXY=http://127.0.0.1:1080 (Cloudflare WARP via
+ * YT_BRIEFING_PROXY env (optional): HTTP proxy URL — required on datacenter/VPS IPs which
+ *   YouTube blocks. Example: YT_BRIEFING_PROXY=http://127.0.0.1:1080 (Cloudflare WARP via
  *   Docker). See docs/warp-proxy.md.
  */
 
@@ -29,13 +29,13 @@ import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { CACHE_DIR, ENV_PATH } from './lib/paths.ts';
 
-// Load .env so YT_PROXY is set when run standalone under Node (Bun auto-loads it; Node doesn't).
+// Load .env so YT_BRIEFING_PROXY is set when run standalone under Node (Bun auto-loads it; Node doesn't).
 // When spawned by yt-sweep, the parent already loaded it and the child inherits the env.
 dotenv.config({ path: ENV_PATH });
 
 /** Resolve the yt-dlp binary: explicit env → project-local ./bin → PATH (Windows-aware). */
 function resolveYtDlp(): string {
-  if (process.env.YT_DLP_PATH) return process.env.YT_DLP_PATH;
+  if (process.env.YT_BRIEFING_DLP_PATH) return process.env.YT_BRIEFING_DLP_PATH;
   const exe = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
   const local = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', exe);
   return existsSync(local) ? local : exe;   // bare name → looked up on PATH
@@ -65,7 +65,7 @@ function extractVideoId(input: string): string {
 
 const videoId = extractVideoId(rawInput);
 
-const proxyUrl = process.env.YT_PROXY;
+const proxyUrl = process.env.YT_BRIEFING_PROXY;
 
 function vttToText(vtt: string): string {
   let prev = '';
@@ -111,7 +111,7 @@ const cleanup = () => { try { rmSync(tmpDir, { recursive: true }); } catch {} };
 if (result.error) {
   cleanup();
   const msg = (result.error as NodeJS.ErrnoException).code === 'ENOENT'
-    ? `yt-dlp not found (looked for "${YT_DLP}") — install it or set YT_DLP_PATH (see README.md → Requirements)`
+    ? `yt-dlp not found (looked for "${YT_DLP}") — install it or set YT_BRIEFING_DLP_PATH (see README.md → Requirements)`
     : `yt-dlp spawn error: ${result.error.message}`;
   console.error(msg);
   process.exit(3);

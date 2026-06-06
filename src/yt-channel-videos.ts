@@ -13,7 +13,7 @@
  *   Filtered OUT: current and upcoming live broadcasts (no transcript yet, never consumable).
  *   --no-enrich → skip the videos.list pass; type/durationSeconds omitted; no filtering.
  *
- * Requires: YOUTUBE_API_KEY (see .env.example). Thin CLI wrapper over lib/yt-api.ts.
+ * Requires: YT_BRIEFING_YOUTUBE_API_KEY (see .env.example). Thin CLI wrapper over lib/yt-api.ts.
  *
  * Quota: ~1 unit per page (playlistItems.list) + 1 unit per 50 videos (videos.list).
  */

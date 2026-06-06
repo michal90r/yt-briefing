@@ -9,7 +9,7 @@ description: Briefing from the YouTube channels you follow — the engine sweeps
 
 `data/state.md` is the only persistent cursor. Session state — queue, pending, prefetch, background fill — lives in `data/.cache/` (rebuilt each run, never important to keep). Internals — lazy queue build, filters, summary format, LLM model, transcript fetching, prefetch, proxy — are in `README.md`, not here. No manual pre-flight: the engine self-invalidates a stale queue (new day or `--reset`).
 
-**Run the engine bare — no redirects.** Its stdout is a pure JSON line and stderr is empty, so `JSON.parse` of the raw output just works; **never** redirect stderr to `/tmp` or any OS temp dir. For timing diagnostics ("why is the sweep slow") run it once with `YT_DEBUG=1` — it appends per-stage timings to the gitignored `data/.cache/sweep.log`.
+**Run the engine bare — no redirects.** Its stdout is a pure JSON line and stderr is empty, so `JSON.parse` of the raw output just works; **never** redirect stderr to `/tmp` or any OS temp dir. For timing diagnostics ("why is the sweep slow") run it once with `YT_BRIEFING_DEBUG=1` — it appends per-stage timings to the gitignored `data/.cache/sweep.log`.
 
 For fast first paint, the engine expands channels in parallel waves until it has the first ratable video, while a detached background process expands the rest in parallel. And while the user rates a video, it warms the **next** video's summary in another background process, so the following step usually emits instantly. All fully internal — the loop below is unchanged.
 

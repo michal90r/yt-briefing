@@ -17,7 +17,7 @@
  *   {"status":"rate_limited"}
  *
  * The engine ONLY writes files under DATA_DIR — it never runs git or any VCS. If you
- * want your briefing state versioned, commit DATA_DIR yourself (or point YT_DATA_DIR at
+ * want your briefing state versioned, commit DATA_DIR yourself (or point YT_BRIEFING_DATA_DIR at
  * a synced folder). Keeping persistence out of the engine is deliberate: it stays a pure
  * data tool with zero host coupling.
  *
@@ -80,9 +80,9 @@ const today = new Date().toISOString().slice(0, 10);
 const LANG = outputLang();
 
 // Diagnostics sink. Default: silent (stdout stays a pure JSON line — the caller never
-// has to redirect anything, so no /tmp). With YT_DEBUG set, timing + child stderr append
+// has to redirect anything, so no /tmp). With YT_BRIEFING_DEBUG set, timing + child stderr append
 // to <DATA_DIR>/.cache/sweep.log (gitignored) — never an OS temp dir.
-const DEBUG = !!process.env.YT_DEBUG;
+const DEBUG = !!process.env.YT_BRIEFING_DEBUG;
 const T0 = Date.now();
 const log = (msg: string) => { if (DEBUG) appendFileSync(LOG_FILE, `⏱ ${msg} (+${Date.now() - T0}ms)\n`); };
 
@@ -119,7 +119,7 @@ function run(cmd: string[]): Promise<{ stdout: string; code: number }> {
     let stdout = '';
     p.stdout.on('data', d => { stdout += d.toString(); });
     // Child stderr → the gitignored debug log only (never parent stderr / stdout), so a
-    // bare invocation emits nothing but the JSON line. Silent unless YT_DEBUG.
+    // bare invocation emits nothing but the JSON line. Silent unless YT_BRIEFING_DEBUG.
     if (DEBUG) p.stderr.on('data', d => appendFileSync(LOG_FILE, d.toString()));
     else p.stderr.resume();   // drain so the child never blocks on a full pipe
     p.on('close', code => resolve({ stdout, code: code ?? 1 }));

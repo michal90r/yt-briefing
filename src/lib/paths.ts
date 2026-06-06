@@ -7,9 +7,9 @@
  *              itself) this IS the package root, so the repo layout (`.env`, `data/`) is
  *              unchanged. When the package is *consumed as a dependency* — PKG_ROOT sits
  *              inside node_modules — that would be wiped on reinstall, so BASE_DIR moves to
- *              `<your project>/.yt-briefing/` instead. Override explicitly with YT_BASE_DIR.
+ *              `<your project>/.yt-briefing/` instead. Override explicitly with YT_BRIEFING_BASE_DIR.
  *   DATA_DIR   the mutable state (subscriptions, profiles, cursor, throwaway cache).
- *              Defaults to <BASE_DIR>/data; override with YT_DATA_DIR to keep it anywhere
+ *              Defaults to <BASE_DIR>/data; override with YT_BRIEFING_DATA_DIR to keep it anywhere
  *              (e.g. a synced git folder, separate from secrets).
  *
  * BASE_DIR and DATA_DIR are pinned back into the environment so detached child processes —
@@ -30,17 +30,17 @@ const SCRIPT_EXT = extname(SELF) || '.ts';
 
 // Consumed as a dependency? Then PKG_ROOT lives under node_modules and must not hold user state.
 const CONSUMED = PKG_ROOT.split(sep).includes('node_modules');
-export const BASE_DIR = process.env.YT_BASE_DIR
-  ? resolve(process.env.YT_BASE_DIR)
+export const BASE_DIR = process.env.YT_BRIEFING_BASE_DIR
+  ? resolve(process.env.YT_BRIEFING_BASE_DIR)
   : CONSUMED ? join(process.cwd(), '.yt-briefing') : PKG_ROOT;
-process.env.YT_BASE_DIR = BASE_DIR;                    // pin for children (their cwd differs)
+process.env.YT_BRIEFING_BASE_DIR = BASE_DIR;                    // pin for children (their cwd differs)
 
 export const ENV_PATH = join(BASE_DIR, '.env');
 
-export const DATA_DIR = process.env.YT_DATA_DIR
-  ? resolve(process.env.YT_DATA_DIR)
+export const DATA_DIR = process.env.YT_BRIEFING_DATA_DIR
+  ? resolve(process.env.YT_BRIEFING_DATA_DIR)
   : join(BASE_DIR, 'data');
-process.env.YT_DATA_DIR = DATA_DIR;                    // pin for children (their cwd differs)
+process.env.YT_BRIEFING_DATA_DIR = DATA_DIR;                    // pin for children (their cwd differs)
 
 export const CHANNELS_MD = join(DATA_DIR, 'channels.md');
 export const STATE_MD = join(DATA_DIR, 'state.md');

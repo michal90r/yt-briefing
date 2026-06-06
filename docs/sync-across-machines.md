@@ -23,11 +23,11 @@ your project's own git: push from machine A, pull on machine B. Keep `.yt-briefi
 git-ignored — secrets stay per machine.
 
 Want briefing state in **its own** repo instead (e.g. a laptop and a headless VPS that share
-nothing else)? Point `YT_DATA_DIR` at a folder you control and version that:
+nothing else)? Point `YT_BRIEFING_DATA_DIR` at a folder you control and version that:
 
 ```bash
 # .env  (per machine — secrets never sync)
-YT_DATA_DIR=/home/you/yt-briefing-data
+YT_BRIEFING_DATA_DIR=/home/you/yt-briefing-data
 ```
 
 ```bash
@@ -38,7 +38,7 @@ npx yt-briefing init                     # onboard into this folder (or move exi
 git add -A && git commit -m "initial" && git push -u origin main
 ```
 
-On the second machine: clone that repo, set the same `YT_DATA_DIR`, drop in your `.env`.
+On the second machine: clone that repo, set the same `YT_BRIEFING_DATA_DIR`, drop in your `.env`.
 
 ---
 
@@ -71,7 +71,7 @@ Save as `yt-sync.sh` (anywhere), `chmod +x`:
 #!/usr/bin/env bash
 # Persist yt-briefing state to git, sync-safe across machines. Best-effort, never blocks.
 set -uo pipefail
-DATA="${YT_DATA_DIR:-$PWD/.yt-briefing/data}"   # the folder you version (default: in-project)
+DATA="${YT_BRIEFING_DATA_DIR:-$PWD/.yt-briefing/data}"   # the folder you version (default: in-project)
 cd "$DATA" || exit 0
 
 git add channels.md state.md channels/ config.json 2>/dev/null || exit 0
@@ -113,7 +113,7 @@ yt-briefing rate --rating 0 && /path/to/yt-sync.sh
 
 > Optional but recommended: also `git pull --rebase` **before** the first sweep of a session
 > (so a machine starts on the latest cursor), e.g. a `PreToolUse` hook matching
-> `*yt-sweep*--reset*`, or just `cd "$YT_DATA_DIR" && git pull --rebase` before you start.
+> `*yt-sweep*--reset*`, or just `cd "$YT_BRIEFING_DATA_DIR" && git pull --rebase` before you start.
 
 ---
 

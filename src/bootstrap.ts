@@ -15,8 +15,9 @@
  */
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
-  DATA_DIR, CHANNELS_DIR, CHANNELS_MD, STATE_MD, CONFIG_JSON, ENV_PATH, profilePath,
+  DATA_DIR, BASE_DIR, PKG_ROOT, CHANNELS_DIR, CHANNELS_MD, STATE_MD, CONFIG_JSON, ENV_PATH, profilePath,
 } from './lib/paths.ts';
 import { AGENTS, installSkill, projectSkillDir, customSkillDirDefault, isPackageDevCwd } from './lib/skill-install.ts';
 import { question } from './lib/prompt.ts';
@@ -107,17 +108,17 @@ function main(): void {
     llmModel = ask('  Model (Enter to accept)', picked.model);
   } else {
     console.log('\n     → Custom / local endpoint (e.g. Ollama at http://localhost:11434/v1)');
-    llmBaseUrl = ask('  LLM_BASE_URL', 'http://localhost:11434/v1');
-    llmModel = ask('  LLM_MODEL', 'llama3.1');
-    llmKey = ask('  LLM_API_KEY (blank for local)', '');
+    llmBaseUrl = ask('  YT_BRIEFING_LLM_BASE_URL', 'http://localhost:11434/v1');
+    llmModel = ask('  YT_BRIEFING_LLM_MODEL', 'llama3.1');
+    llmKey = ask('  YT_BRIEFING_LLM_API_KEY (blank for local)', '');
   }
 
   console.log('\n  3) YouTube Data API (needed to list channel uploads)');
   console.log('     Get a key: https://console.cloud.google.com → YouTube Data API v3');
-  const ytKey = ask('  YOUTUBE_API_KEY');
+  const ytKey = ask('  YT_BRIEFING_YOUTUBE_API_KEY');
 
   console.log('\n  4) Proxy (optional — only needed on datacenter/VPS IPs; see docs/warp-proxy.md)');
-  const ytProxy = ask('  YT_PROXY (blank = direct)', '');
+  const ytProxy = ask('  YT_BRIEFING_PROXY (blank = direct)', '');
 
   // 5. Channels ----------------------------------------------------------------
   // Just collect a flat list. No categories, no per-channel rules to define up front —
@@ -167,14 +168,21 @@ function main(): void {
 
   // .env
   const envBody = [
-    `LLM_BASE_URL=${llmBaseUrl}`,
-    `LLM_API_KEY=${llmKey}`,
-    `LLM_MODEL=${llmModel}`,
-    `YOUTUBE_API_KEY=${ytKey}`,
-    `YT_PROXY=${ytProxy}`,
+    `YT_BRIEFING_LLM_BASE_URL=${llmBaseUrl}`,
+    `YT_BRIEFING_LLM_API_KEY=${llmKey}`,
+    `YT_BRIEFING_LLM_MODEL=${llmModel}`,
+    `YT_BRIEFING_YOUTUBE_API_KEY=${ytKey}`,
+    `YT_BRIEFING_PROXY=${ytProxy}`,
     '',
   ].join('\n');
   writeFileSync(ENV_PATH, envBody, 'utf8');
+
+  // Secret-safety for the consume layout: drop a .gitignore inside .yt-briefing/ so .env never
+  // gets committed regardless of the host project's own ignore rules. data/ stays versionable
+  // (for sync). In a dev clone (BASE_DIR === PKG_ROOT) the repo's own .gitignore already covers it.
+  if (BASE_DIR !== PKG_ROOT) {
+    writeFileSync(join(BASE_DIR, '.gitignore'), '.env\ndata/.cache/\n', 'utf8');
+  }
 
   // config.json
   writeFileSync(CONFIG_JSON, JSON.stringify({ output_lang: outputLang }, null, 2) + '\n', 'utf8');

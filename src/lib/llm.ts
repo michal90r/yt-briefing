@@ -1,7 +1,7 @@
 /**
  * Minimal OpenAI-compatible chat client — the only LLM dependency in yt-briefing.
  *
- * Provider-agnostic: point LLM_BASE_URL at any OpenAI-compatible endpoint —
+ * Provider-agnostic: point YT_BRIEFING_LLM_BASE_URL at any OpenAI-compatible endpoint —
  * OpenRouter (default, "any model, one key"), Google Gemini's OpenAI-compat
  * endpoint, OpenAI itself, a local Ollama, etc. The tool depends only on an API key
  * here — not on any specific vendor and not on a coding agent being installed.
@@ -11,28 +11,28 @@
  * the summaries.
  *
  * Env (see .env.example):
- *   LLM_BASE_URL   default https://openrouter.ai/api/v1
- *   LLM_API_KEY    required
- *   LLM_MODEL      default google/gemini-2.5-flash
+ *   YT_BRIEFING_LLM_BASE_URL   default https://openrouter.ai/api/v1
+ *   YT_BRIEFING_LLM_API_KEY    required
+ *   YT_BRIEFING_LLM_MODEL      default google/gemini-2.5-flash
  */
 
 const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "google/gemini-2.5-flash";
 
 export function getModel(): string {
-  return process.env.LLM_MODEL || DEFAULT_MODEL;
+  return process.env.YT_BRIEFING_LLM_MODEL || DEFAULT_MODEL;
 }
 
 export interface ChatOptions {
-  model?: string;       // overrides LLM_MODEL
+  model?: string;       // overrides YT_BRIEFING_LLM_MODEL
   system?: string;      // optional system prompt
   temperature?: number; // default 0.3
 }
 
 export async function chat(prompt: string, opts: ChatOptions = {}): Promise<string> {
-  const baseUrl = (process.env.LLM_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");
-  const apiKey = process.env.LLM_API_KEY;
-  if (!apiKey) throw new Error("LLM_API_KEY not set (see .env.example)");
+  const baseUrl = (process.env.YT_BRIEFING_LLM_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");
+  const apiKey = process.env.YT_BRIEFING_LLM_API_KEY;
+  if (!apiKey) throw new Error("YT_BRIEFING_LLM_API_KEY not set (see .env.example)");
   const model = opts.model || getModel();
 
   const messages: Array<{ role: "system" | "user"; content: string }> = [];

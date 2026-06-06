@@ -55,9 +55,9 @@ Any OpenAI-compatible endpoint works. Gemini 2.5 Flash is the easy default. It's
 and free to start at [Google AI Studio](https://aistudio.google.com/apikey):
 
 ```ini
-LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-LLM_API_KEY=<gemini-key>
-LLM_MODEL=gemini-2.5-flash
+YT_BRIEFING_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+YT_BRIEFING_LLM_API_KEY=<gemini-key>
+YT_BRIEFING_LLM_MODEL=gemini-2.5-flash
 ```
 
 > On the free tier Gemini sometimes returns a "model is overloaded / high demand" error. Retry,
@@ -90,9 +90,19 @@ YouTube and gets your IP rate-limited or blocked, which is easy to hit on a serv
 them at the speed you actually work through the queue keeps you under the radar and the queue
 flowing.
 
+## First run vs later
+
+On a channel's first sweep there is no history, so yt-briefing takes the latest video of each
+kind: the newest long-form, the newest short, and the newest live. That gives you a baseline
+without pulling the whole back catalog.
+
+After that it works from history. Each rating moves a per-type cursor forward, so later runs
+only surface videos newer than the ones you already handled, and a session just continues where
+the last one left off.
+
 ## Sync across machines
 
-Your state is plain files in `.yt-briefing/data/`. Version that folder (or point `YT_DATA_DIR`
+Your state is plain files in `.yt-briefing/data/`. Version that folder (or point `YT_BRIEFING_DATA_DIR`
 at a separate private repo) and commit after each rating. Recipe:
 [docs/sync-across-machines.md](./docs/sync-across-machines.md).
 
