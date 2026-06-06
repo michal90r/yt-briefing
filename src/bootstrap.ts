@@ -21,6 +21,7 @@ import {
 } from './lib/paths.ts';
 import { AGENTS, installSkill, projectSkillDir, customSkillDirDefault, isPackageDevCwd } from './lib/skill-install.ts';
 import { question } from './lib/prompt.ts';
+import { normalizeHandle, slugify, serializeChannels, serializeState, profileBody, baselineStateRow } from './lib/channels.ts';
 
 const ask = (q: string, def = ''): string => {
   const a = question(def ? `${q} [${def}]:` : `${q}:`).trim();
@@ -31,38 +32,6 @@ const askYN = (q: string, def = true): boolean => {
   if (!a) return def;
   return a.startsWith('y');
 };
-
-/**
- * Accept any of: `@betterstack`, `betterstack`, `https://www.youtube.com/@betterstack`
- * (with or without a trailing `/videos` etc.) → canonical `@betterstack`. Returns null if
- * no handle can be read (e.g. a bare `/channel/UC…` URL — ask the user for the @handle).
- */
-function normalizeHandle(input: string): string | null {
-  let s = input.trim();
-  if (/youtube\.com/i.test(s) || /^https?:\/\//i.test(s)) {
-    const m = s.match(/@[A-Za-z0-9._-]+/);   // pull the @handle out of a URL
-    s = m ? m[0] : '';
-  }
-  s = s.replace(/^@+/, '').replace(/[^A-Za-z0-9._-].*$/, '');   // bare token
-  return s ? `@${s}` : null;
-}
-
-/** kebab-case slug that also breaks CamelCase: "BetterStack" → "better-stack". */
-function slugify(s: string): string {
-  return s
-    .replace(/@/g, '')
-    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
-    .replace(/[^A-Za-z0-9]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .toLowerCase();
-}
-
-const today = new Date().toISOString().slice(0, 10);
-// Fresh channels start "baseline": the first sweep surfaces the latest upload per type.
-// updated is set this far back so that window actually contains a recent video.
-const BASELINE_LOOKBACK_DAYS = 60;
-const lookback = new Date(Date.now() - BASELINE_LOOKBACK_DAYS * 864e5).toISOString().slice(0, 10);
 
 interface ChannelInput { handle: string; slug: string; }
 
@@ -187,60 +156,11 @@ function main(): void {
   // config.json
   writeFileSync(CONFIG_JSON, JSON.stringify({ output_lang: outputLang }, null, 2) + '\n', 'utf8');
 
-  // channels.md — a flat list of the channels you follow.
-  const chParts: string[] = [
-    '---',
-    'type: yt-config',
-    'name: yt-channels',
-    'description: The channels you follow. Per-channel learned signal lives in channels/<slug>.md.',
-    `updated: ${today}`,
-    '---',
-    '',
-    '# Channels',
-    '',
-  ];
-  for (const c of channels) {
-    chParts.push(`- [${c.handle}](https://www.youtube.com/${c.handle}) → [[channels/${c.slug}]]`);
-  }
-  writeFileSync(CHANNELS_MD, chParts.join('\n') + '\n', 'utf8');
-
-  // state.md — one flat table (baseline rows: pointers "—", updated = lookback so the first
-  // sweep finds the latest upload per type).
-  const stParts: string[] = [
-    '---',
-    'type: yt-state',
-    'name: yt-state',
-    'description: Per-channel per-type cursor. The sweep reads and updates it.',
-    `updated: ${today}`,
-    '---',
-    '',
-    '# State',
-    '',
-    '| Channel | last_longform_id | last_short_id | last_live_id | updated | session |',
-    '|---|---|---|---|---|---|',
-  ];
-  for (const c of channels) {
-    stParts.push(`| ${c.handle} | — | — | — | ${lookback} | 0 |`);
-  }
-  writeFileSync(STATE_MD, stParts.join('\n') + '\n', 'utf8');
-
-  // per-channel profiles
-  for (const c of channels) {
-    const pParts: string[] = [
-      '---',
-      'type: yt-channel-profile',
-      `name: ${c.slug}-profile`,
-      `channel: ${c.handle}`,
-      `channel_url: https://www.youtube.com/${c.handle}`,
-      `updated: ${today}`,
-      'sessions_observed: 0',
-      '---',
-      '',
-      `# ${c.handle} — Profile`,
-      '',
-    ];
-    writeFileSync(profilePath(c.slug), pParts.join('\n') + '\n', 'utf8');
-  }
+  // channels.md / state.md / per-channel profiles — via the shared serializers, so the
+  // on-disk format is identical to what the add/remove command writes (single source).
+  writeFileSync(CHANNELS_MD, serializeChannels(channels), 'utf8');
+  writeFileSync(STATE_MD, serializeState(channels.map(c => baselineStateRow(c.handle))), 'utf8');
+  for (const c of channels) writeFileSync(profilePath(c.slug), profileBody(c.handle, c.slug), 'utf8');
 
   console.log('  ' + '─'.repeat(40));
   console.log(`  Done. Wrote:`);

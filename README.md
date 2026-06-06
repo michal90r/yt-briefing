@@ -53,6 +53,14 @@ npx yt-briefing init      # or: bunx yt-briefing init
 
 `init` asks for your language, your keys, the channels to follow, and which tool runs `/yt`.
 
+Add or remove channels anytime:
+
+```bash
+npx yt-briefing add @handle https://youtube.com/@another   # one or more, handle or URL
+npx yt-briefing remove @handle                              # also deletes its learned profile
+npx yt-briefing list                                        # show the current list
+```
+
 ## Run it
 
 Open your project in Claude Code or Cursor and run `/yt`. If it's not listed, start a fresh
