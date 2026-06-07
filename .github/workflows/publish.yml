@@ -1,0 +1,38 @@
+name: Publish to npm
+
+# Publishes on a version tag. Release flow:
+#   npm version <patch|minor|major>   # bumps package.json + creates the vX.Y.Z tag
+#   git push --follow-tags            # pushes the commit and the tag → triggers this workflow
+#
+# Auth is npm Trusted Publishing (OIDC) — no NPM_TOKEN secret, no OTP. It also attaches a
+# provenance attestation automatically. One-time setup on npmjs.com (required, or publish 403s):
+#   npmjs.com → the package → Settings → Trusted Publisher → GitHub Actions
+#   Repository: michal90r/yt-briefing   Workflow: publish.yml
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write   # required for OIDC trusted publishing + provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      # Trusted Publishing (OIDC) needs npm >= 11.5; the bundled npm may be older.
+      - run: npm install -g npm@latest
+
+      # No committed package-lock.json (bun is the local lockfile), so a plain install.
+      # `prepare` builds dist/ on install; `npm publish` runs it again before packing.
+      - run: npm install
+
+      - run: npm publish
