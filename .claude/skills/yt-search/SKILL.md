@@ -1,14 +1,18 @@
 ---
 name: yt-search
-description: Research a topic across YouTube — describe an intent, the engine expands it into search queries, ranks results against your intent, then lazily yields ONE video at a time with a rich summary. You keep or skip each; at the end it synthesizes a comparison from everything you kept. Same transcript engine + proxy as /yt; lazy on purpose (no transcript bursts → no IP block). Summaries and prompts use the language chosen at onboarding.
-argument-hint: A descriptive intent in quotes, e.g. "which terminal for coding with Claude Code". Optional --max N, --since YYYY-MM-DD, --queries 1..3.
+description: Search WITHIN one YouTube channel by intent — name a channel and what you're after; the engine lists that channel's uploads, ranks them against your intent (metadata only, no transcript yet), then lazily yields ONE matching video at a time with a rich summary. You keep or skip each; at the end it synthesizes a comparison from everything you kept. Channel-scoped, not whole-YouTube. Same transcript engine + proxy as /yt; lazy on purpose (no transcript bursts → no IP block). Summaries and prompts use the language chosen at onboarding.
+argument-hint: A channel (@handle or URL) and a descriptive intent, e.g. "@t3dotgg which terminal for AI coding". Optional --max N, --scan N, --since YYYY-MM-DD.
 ---
 
 ## How it works
 
-`src/yt-search.ts` is the whole engine: intent → query expansion (LLM) → `search.list` → re-rank against the intent on metadata only (no transcript) → **lazy** one-candidate-at-a-time yield with a rich summary → record keep/skip → on demand synthesize a comparison from everything kept. Matching is **descriptive, not exact-keyword** — YouTube ranks by relevance and the LLM bridges intent→query and filters noise. This skill is a thin loop: paste the summary, collect keep/skip, show the final comparison. It runs no filters and formats nothing itself.
+`src/yt-search.ts` is the whole engine: list one channel's uploads (cheap — `playlistItems`, ~1 quota unit/page; NOT `search.list`) → re-rank them against your intent on metadata only (title/description, no transcript) → **lazy** one-candidate-at-a-time yield with a rich summary → record keep/skip → on demand synthesize a comparison from everything kept. **Channel-scoped on purpose** — you choose where to look; it does NOT search all of YouTube. Matching is descriptive: the LLM filters the channel's videos by intent. This skill is a thin loop — paste the summary, collect keep/skip, show the final comparison.
 
 **Lazy on purpose:** one transcript per step, never a burst — a burst looks like scraping and gets the IP blocked (same reason `/yt` is lazy). Run the engine bare — stdout is a single JSON line, stderr empty; never redirect.
+
+## Inputs
+
+The user gives a **channel** (`@handle` or a channel URL) and an **intent** (what to look for). Pass the channel via `--channel` and the intent as the quoted positional. If the user names a channel but no clear intent (or vice versa), ask for the missing half before running.
 
 ## Language
 
@@ -17,11 +21,11 @@ Read `data/config.json` → `output_lang` once at the start. Phrase the question
 ## Loop
 
 ```
-out = JSON.parse(`bun run src/yt-search.ts "<intent from the user>" --reset`)   // first call
+out = JSON.parse(`bun run src/yt-search.ts "<intent>" --channel <@handle|url> --reset`)   // first call
 while true:
   out.status:
     "error"           → show out.error verbatim, stop
-    "no_results"      → tell the user nothing relevant was found, stop
+    "no_results"      → tell the user nothing in that channel matched, stop
     "rate_limited"    → transcript fetch blocked (datacenter IP) — tell the user, stop; recovery in README.md → Running on a VPS
     "decision_needed" → steps A–C
     "done"            → step D
@@ -38,16 +42,16 @@ while true:
     - Keep → `bun run src/yt-search.ts --keep`
     - Skip → `bun run src/yt-search.ts --skip`
     - stop/dismissed → `bun run src/yt-search.ts --compare` (skip straight to D)
-  - The script reads the pending candidate from cache; pass only `--keep` / `--skip` / `--compare`. Its JSON becomes the next `out` — back to the top of the loop.
+  - The script reads the pending candidate from cache; pass only `--keep` / `--skip` / `--compare` (no channel/intent again). Its JSON becomes the next `out` — back to the top of the loop.
 
 **On `done` (step D):**
 
-- If `out.kept > 0` → run `out = JSON.parse(\`bun run src/yt-search.ts --compare\`)`; when it returns `status:"compare"`, paste `out.comparison` **verbatim** as your chat text (it's the artifact — a decision-grade comparison in `output_lang`). Stop.
+- If `out.kept > 0` → run `out = JSON.parse(\`bun run src/yt-search.ts --compare\`)`; when it returns `status:"compare"`, paste `out.comparison` **verbatim** as your chat text (the artifact — a decision-grade comparison in `output_lang`). Stop.
 - If `out.kept == 0` → tell the user nothing was kept, so there's nothing to compare. Stop.
 
 ## Rules
 
 - **Verbatim:** paste `summary` and `comparison` exactly as returned; never paste a raw transcript.
 - **Language:** question text + option descriptions follow `output_lang`; button labels stay `Keep` / `Skip`.
-- **Cost awareness:** each search runs `search.list` (100 quota units/query, up to `--queries`). Don't silently re-run `--reset` in a loop. A bare resume (no `--reset`) continues the same ranked queue without new searches.
-- **Stateless triage:** this is independent of `/yt` (no channels, no ratings). For the recurring channel briefing use `/yt`; for one video use `/yt-transcribe`.
+- **Scope:** one channel per search. Listing is cheap; the cost is the lazy transcript fetches, so let the user keep/skip rather than pulling everything. A bare resume (no `--reset`) continues the same ranked queue. `--scan N` (default 50) caps how many recent uploads are considered; `--since` widens by date.
+- **Stateless triage:** independent of `/yt` (no channel profiles, no ratings written). For the recurring multi-channel briefing use `/yt`; for one known video use `/yt-transcribe`.

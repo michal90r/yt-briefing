@@ -5,6 +5,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-06-07
+
+### Changed
+- `/yt-search` is now **channel-scoped**: you name a channel (`--channel <@handle|url>`) and an
+  intent, and it searches within that channel instead of all of YouTube. Candidates come from the
+  channel's uploads (cheap `playlistItems`, ~1 quota unit/page) re-ranked against the intent, not
+  from `search.list`. The lazy triage + comparison flow is unchanged. New flags: `--channel`
+  (required), `--scan N` (recent uploads to consider, default 50); dropped `--queries`.
+  _(0.5.0's whole-YouTube search shipped minutes earlier with no consumers — replaced cleanly.)_
+
+### Removed
+- `searchVideos()` / whole-YouTube `search.list` path (superseded by channel-scoped search).
+
 ## [0.5.0] - 2026-06-07
 
 ### Added
@@ -80,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[0.6.0]: https://github.com/michal90r/yt-briefing/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/michal90r/yt-briefing/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/michal90r/yt-briefing/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/michal90r/yt-briefing/compare/v0.3.1...v0.3.2

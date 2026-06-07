@@ -77,24 +77,26 @@ The skill is installed alongside `/yt` by `init` / `install-skill`. From the pla
 npx yt-briefing transcribe <url-or-id> --lang auto   # prints the transcript to stdout
 ```
 
-## Research a topic across YouTube
+## Search within a channel
 
-Want to know what YouTube says about something — and get an actual comparison, not a pile of
-links? Run `/yt-search` and describe the intent, e.g. `which terminal for coding with Claude
-Code`. The matching is **descriptive, not exact keywords**: an LLM turns your intent into search
-queries, then ranks the results against what you actually meant (on titles/descriptions — no
-transcripts yet). Then it hands you **one video at a time** with a rich summary; you **Keep** or
-**Skip** each. At the end it synthesizes a **comparison** from everything you kept.
+Following a creator and want to mine *their* videos for something specific — and get an actual
+comparison, not a pile of links? Run `/yt-search`, name a **channel** and your **intent**, e.g.
+`@t3dotgg which terminal for AI coding`. It lists that channel's uploads, ranks them against your
+intent (titles/descriptions — no transcripts yet, matching is **descriptive, not exact keywords**),
+then hands you **one matching video at a time** with a rich summary; you **Keep** or **Skip** each.
+At the end it synthesizes a **comparison** from everything you kept.
 
-It's lazy on purpose — one transcript per step, never a burst (a burst gets your IP blocked, same
-as `/yt`). Summaries and the comparison use the language you chose at setup.
+It's channel-scoped on purpose (you choose where to look) and lazy — one transcript per step, never
+a burst (a burst gets your IP blocked, same as `/yt`). Summaries and the comparison use the
+language you chose at setup.
 
 ```bash
-yt-briefing search "<intent>" [--max N] [--queries 1..3] [--since YYYY-MM-DD]   # JSON status line
+yt-briefing search "<intent>" --channel <@handle|url> [--max N] [--scan N] [--since YYYY-MM-DD]
 ```
 
-> Each search calls the YouTube `search.list` endpoint, which costs **100 quota units per query**
-> (plain reads cost 1; the daily free quota is 10,000). `--queries` (default 2) caps how many.
+> Listing a channel's uploads is cheap (`playlistItems`, ~1 quota unit per 50 videos — not the
+> 100-unit `search.list`). `--scan` (default 50) caps how many recent uploads are considered;
+> `--since` widens by date.
 
 ## Run it
 

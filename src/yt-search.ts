@@ -1,23 +1,22 @@
 #!/usr/bin/env node
 /**
- * yt-search.ts — ad-hoc topic search → lazy triage → comparison. The third yt-briefing mode,
- * sibling to the channel briefing (yt-sweep) and one-shot transcribe (yt-transcript).
+ * yt-search.ts — search WITHIN one channel by intent, then lazy triage → comparison. The third
+ * yt-briefing mode, sibling to the channel briefing (yt-sweep) and one-shot transcribe.
  *
- * You describe an intent ("which terminal for coding with Claude Code"); the engine:
- *   1. expands it into a few YouTube search queries (LLM),
- *   2. runs search.list and merges candidates,
- *   3. re-ranks candidates against your intent on metadata only — title/channel/description,
- *      NO transcript yet (cheap; protects the expensive/rate-limited transcript step),
- *   4. yields ONE candidate at a time with a rich summary, lazily — never a burst of transcript
- *      fetches (a burst looks like scraping and gets the IP blocked, same reason yt-sweep is lazy),
- *   5. records your keep/skip decision; kept summaries accumulate in a cache,
- *   6. on demand synthesizes a comparison across everything you kept.
+ * You point it at a channel and describe what you're after ("which terminal does he recommend
+ * for AI coding"); the engine:
+ *   1. lists that channel's uploads (cheap — playlistItems, 1 quota unit/page; NOT search.list),
+ *   2. re-ranks them against your intent on metadata only — title/description, NO transcript yet,
+ *   3. yields ONE matching video at a time with a rich summary, lazily — never a burst of
+ *      transcript fetches (a burst looks like scraping and gets the IP blocked),
+ *   4. records your keep/skip decision; kept summaries accumulate in a cache,
+ *   5. on demand synthesizes a comparison across everything you kept.
  *
- * Matching is descriptive, not exact-keyword: search.list already ranks by relevance, and the
- * LLM bridges intent→query (step 1) and filters noise (step 3).
+ * Channel-scoped on purpose: you choose where to look. Matching is descriptive — the LLM filters
+ * the channel's videos by intent (no exact-keyword needed).
  *
  * Usage (the skill / CLI drives these; one JSON line per call):
- *   yt-search "<intent>" [--reset] [--max N] [--queries N] [--since DATE] [--lang auto]
+ *   yt-search "<intent>" --channel <@handle|url> [--reset] [--max N] [--scan N] [--since DATE] [--lang auto]
  *   yt-search --keep        record the pending candidate, advance, yield next
  *   yt-search --skip        drop the pending candidate, advance, yield next
  *   yt-search --compare     synthesize a comparison from everything kept
@@ -26,9 +25,9 @@
  *   {"status":"decision_needed","summary":"<md>","pending":{videoId,title,channelTitle,publishedAt,position,total}}
  *   {"status":"done","kept":N}              queue exhausted — caller runs --compare if kept>0
  *   {"status":"compare","comparison":"<md>"}
- *   {"status":"no_results"}                 search returned nothing for the intent
+ *   {"status":"no_results"}                 the channel has no videos matching the intent
  *   {"status":"rate_limited"}               transcript fetch blocked (datacenter IP — see docs/warp-proxy.md)
- *   {"status":"error","error":"<msg>"}      setup/config problem (missing key, etc.)
+ *   {"status":"error","error":"<msg>"}      setup/config problem (missing key, missing channel, …)
  *
  * Cache (all throwaway, under DATA_DIR/.cache): search-queue.json (ranked candidates + cursor),
  * search-pending.json (current candidate), search-kept.json (kept summaries = compare corpus).
@@ -39,7 +38,8 @@ import { spawn } from 'node:child_process';
 import dotenv from 'dotenv';
 import { chat, getModel } from './lib/llm.ts';
 import { outputLang } from './lib/config.ts';
-import { searchVideos, type SearchHit } from './lib/yt-api.ts';
+import { fetchChannelVideos, type Video } from './lib/yt-api.ts';
+import { normalizeHandle } from './lib/channels.ts';
 import {
   PKG_ROOT, ENV_PATH, CACHE_DIR,
   SEARCH_QUEUE_FILE, SEARCH_PENDING_FILE, SEARCH_KEPT_FILE, script,
@@ -52,26 +52,36 @@ const RUNTIME = process.execPath;
 const LANG = outputLang();
 
 const argv = process.argv.slice(2);
+const VALUE_FLAGS = new Set(['--channel', '--max', '--scan', '--since', '--lang']);
 const has = (f: string) => argv.includes(f);
 const flagVal = (f: string): string | null => {
   const i = argv.indexOf(f);
-  return i !== -1 && argv[i + 1] ? argv[i + 1]! : null;
+  return i !== -1 && argv[i + 1] != null ? argv[i + 1]! : null;
 };
-// First non-flag token is the intent (only on the initial / --reset call).
-const positional = argv.filter((a, i) => !a.startsWith('--') && !(i > 0 && argv[i - 1]!.startsWith('--') && argv[i - 1] !== '--reset' && argv[i - 1] !== '--keep' && argv[i - 1] !== '--skip' && argv[i - 1] !== '--compare'));
-const intentArg = positional[0] ?? null;
+// First token that is neither a flag nor a flag's value is the intent.
+function positionalIntent(): string | null {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (a.startsWith('--')) { if (VALUE_FLAGS.has(a)) i++; continue; }
+    if (i > 0 && VALUE_FLAGS.has(argv[i - 1]!)) continue;
+    return a;
+  }
+  return null;
+}
 
+const intentArg = positionalIntent();
 const RESET = has('--reset');
 const KEEP = has('--keep');
 const SKIP = has('--skip');
 const COMPARE = has('--compare');
+const CHANNEL = flagVal('--channel');
 const MAX = Math.max(1, parseInt(flagVal('--max') || '8', 10));
-const QUERIES = Math.max(1, Math.min(3, parseInt(flagVal('--queries') || '2', 10)));
+const SCAN = Math.max(1, parseInt(flagVal('--scan') || '50', 10));   // recent uploads to consider when no --since
 const SINCE = flagVal('--since');
 const LANGTRACK = flagVal('--lang') || 'auto';
 
-interface Candidate extends SearchHit { score?: number; reason?: string; }
-interface SearchQueue { built_at: string; intent: string; candidates: Candidate[]; cursor: number; }
+interface Candidate { videoId: string; title: string; channelTitle: string; publishedAt: string; description?: string; score?: number; reason?: string; }
+interface SearchQueue { built_at: string; intent: string; channel: string; candidates: Candidate[]; cursor: number; }
 interface Kept { videoId: string; title: string; channelTitle: string; publishedAt: string; summary: string; }
 
 function emit(obj: { status: string; [k: string]: unknown }): never {
@@ -100,62 +110,45 @@ function fetchTranscript(videoId: string): Promise<{ stdout: string; code: numbe
   });
 }
 
-/** Strip ```fences``` and slice the outermost JSON array from an LLM reply. */
+/** Slice the outermost JSON array from an LLM reply (tolerates stray prose / fences). */
 function parseJsonArray(out: string): any[] | null {
   const start = out.indexOf('['), end = out.lastIndexOf(']');
   if (start === -1 || end === -1 || end < start) return null;
   try { return JSON.parse(out.slice(start, end + 1)); } catch { return null; }
 }
 
-// ---------- stage 1: intent → search queries ----------
-async function expandQueries(intent: string): Promise<string[]> {
-  const prompt = `A user wants to research a topic on YouTube. Turn their intent into up to ${QUERIES} effective YouTube search queries (short, keyword-rich, the way people actually search). Cover slightly different angles if useful. Use the language the topic is most discussed in (usually English for tech).
+/** Re-rank a channel's videos against the intent (metadata only — no transcript). */
+async function rerank(intent: string, items: Candidate[]): Promise<Candidate[]> {
+  if (items.length === 0) return [];
+  const compact = items.map(h => ({ id: h.videoId, title: h.title, published: h.publishedAt, desc: (h.description || '').slice(0, 280) }));
+  const prompt = `From this YouTube channel's videos, pick the ones that serve the user's intent and rank them. Judge on title + description only (no transcripts). Drop anything off-topic.
 
 Intent: "${intent}"
 
-Output ONLY a raw JSON array of strings, no fences, no commentary. Example: ["query one","query two"]`;
-  try {
-    const out = await chat(prompt, { system: 'You output ONLY a raw JSON array of search-query strings.', temperature: 0.4 });
-    const arr = parseJsonArray(out);
-    const qs = (arr ?? []).filter((s): s is string => typeof s === 'string' && s.trim().length > 0).slice(0, QUERIES);
-    return qs.length ? qs : [intent];
-  } catch {
-    return [intent];   // expansion is best-effort; fall back to the raw intent
-  }
-}
-
-// ---------- stage 3: re-rank candidates against intent (metadata only) ----------
-async function rerank(intent: string, hits: SearchHit[]): Promise<Candidate[]> {
-  if (hits.length === 0) return [];
-  const compact = hits.map(h => ({ id: h.videoId, title: h.title, channel: h.channelTitle, published: h.publishedAt, desc: (h.description || '').slice(0, 280) }));
-  const prompt = `Rank these YouTube videos by how well they serve the user's intent. Judge on title + channel + description only (no transcripts). Drop clearly off-topic, clickbait, or duplicate-angle results.
-
-Intent: "${intent}"
-
-Candidates:
+Videos:
 ${JSON.stringify(compact)}
 
 Output ONLY a raw JSON array, best first, no fences:
 [{"id":"VIDEO_ID","keep":true,"score":0-100,"reason":"max 12 words"},...]
-Set keep=false for anything not worth the user's time.`;
+Set keep=false for anything not relevant to the intent.`;
   try {
     const out = await chat(prompt, { system: 'You output ONLY a raw JSON array as instructed.', temperature: 0 });
     const arr = parseJsonArray(out);
-    if (!arr) return hits.map(h => ({ ...h }));   // fall back: keep all, original order
-    const byId = new Map(hits.map(h => [h.videoId, h]));
+    if (!arr) return items;   // fall back: keep all, original (newest-first) order
+    const byId = new Map(items.map(h => [h.videoId, h]));
     const ranked: Candidate[] = [];
     for (const r of arr) {
       if (!r || r.keep === false) continue;
       const h = byId.get(r.id);
       if (h) ranked.push({ ...h, score: typeof r.score === 'number' ? r.score : undefined, reason: r.reason });
     }
-    return ranked.length ? ranked : hits.map(h => ({ ...h }));
+    return ranked.length ? ranked : items;
   } catch {
-    return hits.map(h => ({ ...h }));
+    return items;
   }
 }
 
-// ---------- mega-summary for one candidate (the triage artifact) ----------
+/** Rich, standalone summary for one candidate — the triage artifact + compare input. */
 async function megaSummary(c: Candidate, transcript: string, intent: string): Promise<string> {
   const prompt = `Summarize this YouTube video in ${LANG} for a user researching: "${intent}". Make it a RICH, standalone summary they can decide on and that will later feed a cross-video comparison — OR return 'OFFTOPIC: <reason>' if the transcript clearly doesn't serve the intent.
 
@@ -184,7 +177,7 @@ Output ONLY the summary OR 'OFFTOPIC: <reason>'. No preamble.`;
   });
 }
 
-// ---------- stage 6: comparison across kept summaries ----------
+/** Synthesize a comparison across everything kept. */
 async function synthesizeComparison(intent: string, kept: Kept[]): Promise<string> {
   const corpus = kept.map((k, i) => `--- VIDEO ${i + 1}: ${k.channelTitle} — "${k.title}" (${k.publishedAt})\nhttps://youtube.com/watch?v=${k.videoId}\n${k.summary}`).join('\n\n');
   const prompt = `The user researched "${intent}" and kept ${kept.length} YouTube video summaries below. Synthesize a single comparison in ${LANG} that actually helps them decide.
@@ -201,7 +194,7 @@ Language: natural ${LANG}; foreign words only for proper nouns or established te
   return chat(prompt, { system: `You synthesize a decision-grade comparison in ${LANG}. No preamble.`, model: getModel() });
 }
 
-// ---------- lazy yield: advance to the next candidate that has a transcript ----------
+/** Lazy yield: advance to the next candidate that has a transcript, summarize, emit. */
 async function yieldNext(queue: SearchQueue): Promise<never> {
   while (queue.cursor < queue.candidates.length) {
     const c = queue.candidates[queue.cursor]!;
@@ -225,12 +218,7 @@ async function yieldNext(queue: SearchQueue): Promise<never> {
   emit({ status: 'done', kept: loadKept().length });
 }
 
-// ---------- main ----------
 async function main(): Promise<void> {
-  if (!process.env.YT_BRIEFING_YOUTUBE_API_KEY && (RESET || (intentArg && !loadQueue()))) {
-    emit({ status: 'error', error: 'YT_BRIEFING_YOUTUBE_API_KEY is not set — add a YouTube Data API v3 key to .yt-briefing/.env (see README → setup / .env.example).' });
-  }
-
   // --compare: synthesize from kept summaries.
   if (COMPARE) {
     const queue = loadQueue();
@@ -243,7 +231,7 @@ async function main(): Promise<void> {
   // --keep / --skip: record decision on the pending candidate, then advance + yield next.
   if (KEEP || SKIP) {
     const queue = loadQueue();
-    if (!queue) emit({ status: 'error', error: 'No active search. Start one: yt-search "<intent>".' });
+    if (!queue) emit({ status: 'error', error: 'No active search. Start one: yt-search "<intent>" --channel <@handle>.' });
     if (KEEP) {
       const pending = readJSON<Kept | null>(SEARCH_PENDING_FILE, null);
       if (pending) { const kept = loadKept(); kept.push(pending); writeJSON(SEARCH_KEPT_FILE, kept); }
@@ -253,29 +241,34 @@ async function main(): Promise<void> {
     await yieldNext(queue!);
   }
 
-  // Resume an in-progress search (bare call, same intent) without rebuilding.
+  // Resume an in-progress search (bare call, same intent + channel) without rebuilding.
   const existing = loadQueue();
-  if (existing && !RESET && (!intentArg || intentArg === existing.intent)) {
+  if (existing && !RESET && (!intentArg || intentArg === existing.intent) && (!CHANNEL || normalizeHandle(CHANNEL) === existing.channel)) {
     await yieldNext(existing);
   }
 
-  // Fresh search (new intent or --reset).
-  if (!intentArg) emit({ status: 'error', error: 'Provide an intent: yt-search "<what to research>".' });
-  const queries = await expandQueries(intentArg);
-  const seen = new Set<string>();
-  const hits: SearchHit[] = [];
-  for (const q of queries) {
-    let batch: SearchHit[] = [];
-    try { batch = await searchVideos(q, { maxResults: 10, since: SINCE }); }
-    catch (e) { emit({ status: 'error', error: (e as Error).message }); }
-    for (const h of batch) if (!seen.has(h.videoId)) { seen.add(h.videoId); hits.push(h); }
+  // Fresh search: needs an intent AND a channel.
+  if (!process.env.YT_BRIEFING_YOUTUBE_API_KEY) {
+    emit({ status: 'error', error: 'YT_BRIEFING_YOUTUBE_API_KEY is not set — add a YouTube Data API v3 key to .yt-briefing/.env (see README → setup / .env.example).' });
   }
-  if (hits.length === 0) emit({ status: 'no_results' });
+  if (!intentArg) emit({ status: 'error', error: 'Provide an intent: yt-search "<what to look for>" --channel <@handle|url>.' });
+  if (!CHANNEL) emit({ status: 'error', error: 'Provide a channel: --channel <@handle|url>. /yt-search searches within one channel, not all of YouTube.' });
+  const handle = normalizeHandle(CHANNEL);
+  if (!handle) emit({ status: 'error', error: `Could not read a channel handle from "${CHANNEL}" — use @name or the channel URL.` });
 
-  const ranked = (await rerank(intentArg, hits)).slice(0, MAX);
+  let videos: Video[];
+  try {
+    videos = await fetchChannelVideos(handle, { since: SINCE, limit: SINCE ? null : SCAN, enrich: false });
+  } catch (e) {
+    emit({ status: 'error', error: (e as Error).message });
+  }
+  if (videos!.length === 0) emit({ status: 'no_results' });
+
+  const pool: Candidate[] = videos!.map(v => ({ videoId: v.videoId, title: v.title, channelTitle: handle, publishedAt: v.publishedAt, description: v.description }));
+  const ranked = (await rerank(intentArg, pool)).slice(0, MAX);
   if (ranked.length === 0) emit({ status: 'no_results' });
 
-  const queue: SearchQueue = { built_at: new Date().toISOString(), intent: intentArg, candidates: ranked, cursor: 0 };
+  const queue: SearchQueue = { built_at: new Date().toISOString(), intent: intentArg, channel: handle, candidates: ranked, cursor: 0 };
   writeJSON(SEARCH_QUEUE_FILE, queue);
   writeJSON(SEARCH_KEPT_FILE, []);   // fresh search → fresh compare corpus
   await yieldNext(queue);
