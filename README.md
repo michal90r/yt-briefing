@@ -79,24 +79,12 @@ npx yt-briefing transcribe <url-or-id> --lang auto   # prints the transcript to 
 
 ## Search within a channel
 
-Following a creator and want to mine *their* videos for something specific — and get an actual
-comparison, not a pile of links? Run `/yt-search`, name a **channel** and your **intent**, e.g.
-`@t3dotgg which terminal for AI coding`. It lists that channel's uploads, ranks them against your
-intent (titles/descriptions — no transcripts yet, matching is **descriptive, not exact keywords**),
-then hands you **one matching video at a time** with a rich summary; you **Keep** or **Skip** each.
-At the end it synthesizes a **comparison** from everything you kept.
-
-It's channel-scoped on purpose (you choose where to look) and lazy — one transcript per step, never
-a burst (a burst gets your IP blocked, same as `/yt`). Summaries and the comparison use the
-language you chose at setup.
+Mine one channel's videos for a topic and get a comparison. Run `/yt-search` with a channel and
+an intent — e.g. `/yt-search @t3dotgg which terminal for AI coding` — or from the CLI:
 
 ```bash
-yt-briefing search "<intent>" --channel <@handle|url> [--max N] [--scan N] [--since YYYY-MM-DD]
+yt-briefing search "<intent>" --channel <@handle|url>
 ```
-
-> Listing a channel's uploads is cheap (`playlistItems`, ~1 quota unit per 50 videos — not the
-> 100-unit `search.list`). `--scan` (default 50) caps how many recent uploads are considered;
-> `--since` widens by date.
 
 ## Run it
 
