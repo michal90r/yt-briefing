@@ -24,6 +24,7 @@ out = JSON.parse(`bun run src/yt-sweep.ts --reset`)   // Bash — first call: --
 while true:
   out.status:
     "done"          → sweep finished — tell the user, stop
+    "error"         → setup/config problem (e.g. missing API key) — show `out.error` to the user verbatim, stop
     "rate_limited"  → transcript fetch blocked (usually a blocked egress IP) — tell the user, stop; recovery in README.md → Proxy
     "rating_needed" → steps A–E
 ```

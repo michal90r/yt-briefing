@@ -572,5 +572,12 @@ if (reset) {
   clearRest();
   clearPrefetch();
 }
+// Fatal config check, foreground only (the detached --fill / --prefetch children already
+// exited above). A missing YouTube Data API key makes EVERY channel expansion throw the same
+// error, which the per-channel `catch` collapses to 0 items — surfacing as a misleading
+// `status:"done"` ("no new videos"). Fail fast with a clear, actionable error instead.
+if (!process.env.YT_BRIEFING_YOUTUBE_API_KEY) {
+  emit({ status: 'error', error: 'YT_BRIEFING_YOUTUBE_API_KEY is not set — add a YouTube Data API v3 key to .yt-briefing/.env (see README → first run / .env.example).' });
+}
 const queue = loadQueue() ?? buildQueue();
 await advance(queue);
