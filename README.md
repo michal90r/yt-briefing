@@ -80,11 +80,16 @@ npx yt-briefing transcribe <url-or-id> --lang auto   # prints the transcript to 
 ## Search within a channel
 
 Mine one channel's videos for a topic and get a comparison. Run `/yt-search` with a channel and
-an intent — e.g. `/yt-search @t3dotgg which terminal for AI coding` — or from the CLI:
+an intent — e.g. `/yt-search @t3dotgg which terminal for AI coding`:
 
 ```bash
-yt-briefing search "<intent>" --channel <@handle|url>
+yt-briefing search "<intent>" --channel <@handle|url> [--scan N] [--since YYYY-MM-DD] [--max N]
 ```
+
+By default it scans the channel's **50 most recent** uploads and triages the **top 8** matches:
+- `--scan N` — how many recent uploads to consider (default 50)
+- `--since YYYY-MM-DD` — scan everything published since that date instead
+- `--max N` — how many matching videos to triage (default 8)
 
 ## Run it
 
