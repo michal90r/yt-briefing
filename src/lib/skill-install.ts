@@ -17,7 +17,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { PKG_ROOT } from './paths.ts';
+import { PKG_ROOT, DATA_DIR } from './paths.ts';
 
 /** Compiled output dir — what a baked (dist) skill command points the runtime at. */
 const DIST_DIR = join(PKG_ROOT, 'dist');
@@ -45,8 +45,11 @@ export const AGENTS: Record<string, { name: string; sub: string }> = {
 /**
  * The shipped SKILL.md. `dist=false` (default) returns it verbatim — the `bun run src/X.ts`
  * dev form, correct only when cwd is the package AND the runtime is Bun. `dist=true` rewrites
- * the engine commands to `"<process.execPath>" "<abs>/dist/X.js"` — this machine's runtime
- * (Node or Bun) against the compiled build, so it runs from any cwd.
+ * for the consumed case: engine commands become `"<process.execPath>" "<abs>/dist/X.js"` (this
+ * machine's runtime, Node or Bun, against the compiled build, so they run from any cwd), and the
+ * bare `data/…` paths the agent reads (e.g. `data/config.json`) become the absolute `DATA_DIR`.
+ * In dev the agent's cwd IS the package so `data/` resolves; when consumed, DATA_DIR moves to
+ * `<project>/.yt-briefing/data`, so the dev-relative paths would miss — hence the rewrite.
  */
 export function skillBody(dist = false): string {
   const raw = readFileSync(SOURCE, 'utf8');
@@ -55,7 +58,8 @@ export function skillBody(dist = false): string {
   const cmd = (base: string): string => `"${exe}" "${join(DIST_DIR, base + '.js')}"`;
   return raw
     .replace(/bun run src\/yt-sweep\.ts/g, cmd('yt-sweep'))
-    .replace(/bun run src\/yt-rating\.ts/g, cmd('yt-rating'));
+    .replace(/bun run src\/yt-rating\.ts/g, cmd('yt-rating'))
+    .replace(/data\//g, DATA_DIR + '/');
 }
 
 /** Write the skill into `dir` (created if needed). Returns the SKILL.md path written. */
