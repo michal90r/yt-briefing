@@ -1,0 +1,4 @@
+# GitHub language stats (Linguist): count source, not generated output.
+# dist/ is gitignored today, but if it's ever committed it must not skew the bar to JavaScript.
+dist/** linguist-generated=true
+*.lock linguist-generated=true

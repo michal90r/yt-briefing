@@ -35,6 +35,8 @@ line on stdout (stderr stays empty, so callers never redirect to a temp file):
 - `{"status":"done"}` — nothing left.
 - `{"status":"rate_limited"}` — transcript fetch blocked (usually a datacenter IP — see
   [docs/warp-proxy.md](./docs/warp-proxy.md)).
+- `{"status":"error","error":"…"}` — setup/config problem (e.g. missing
+  `YT_BRIEFING_YOUTUBE_API_KEY`); the skill surfaces `error` verbatim and stops.
 
 The `/yt` skill (`.claude/skills/yt/SKILL.md`) is a thin loop over exactly this: paste the
 summary, collect the rating, repeat. `yt-rating` is the only thing that writes a rating;
@@ -55,6 +57,49 @@ everything else lives inside `yt-sweep`.
 - **Learning.** `rating=0` appends the title to the channel's `## Skip titles`; a comment
   becomes a durable rule in `## Notes`; `rating=1` only bumps the cursor. Both filters read
   those sections live on the next sweep — no consolidation step.
+
+## Releasing
+
+Releases are **tag-driven**. Pushing a `vX.Y.Z` tag triggers
+[`.github/workflows/publish.yml`](.github/workflows/publish.yml), which publishes to npm via
+**OIDC Trusted Publishing** — no token, no OTP — with a provenance attestation, and creates a
+**GitHub Release** with auto-generated notes for that tag.
+
+```bash
+# 1. Land your changes + add a CHANGELOG.md entry, then verify
+npm run typecheck && npm run build      # must be green
+git add <changed files> CHANGELOG.md
+git commit -m "describe the change"
+
+# 2. Bump the version → creates the commit + matching vX.Y.Z tag
+npm version patch                        # or minor / major
+
+# 3. Push commit + tag → CI publishes
+git push --follow-tags
+```
+
+Watch it: `gh run watch` (or the Actions tab). Confirm: `npm view yt-briefing version`.
+
+**Choosing the bump (SemVer):** `patch` = bug fix, no behavior change · `minor` = new
+backward-compatible feature · `major` = breaking change (renamed env vars, data format, …).
+
+Notes:
+- **CHANGELOG before the bump.** `npm version` only commits `package.json`, so the
+  `CHANGELOG.md` entry must be in your step-1 commit. Add the compare link at the bottom, e.g.
+  `[0.4.1]: https://github.com/michal90r/yt-briefing/compare/v0.4.0...v0.4.1`.
+- **Clean tree** required (`npm version` refuses on a dirty tree). **`v` prefix** is what the
+  workflow listens for — don't retag to bare `X.Y.Z`.
+- Failure modes: red **403** in Actions → Trusted Publisher misconfigured on npmjs.com;
+  **"cannot publish over existing version"** → you bumped onto a published version.
+
+## Changelog policy
+
+`CHANGELOG.md` is **hand-curated** ([Keep a Changelog](https://keepachangelog.com/) format):
+short, human, grouped by Added / Changed / Fixed — the source of truth for "what changed". The
+**GitHub Release notes are auto-generated** from commits per tag, so the Releases tab needs no
+manual work. To fully automate `CHANGELOG.md` too you'd adopt
+[Conventional Commits](https://www.conventionalcommits.org/) + a generator like
+[git-cliff](https://git-cliff.org/) — only worth it once commit messages follow the convention.
 
 ## Security
 
