@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import {
   DATA_DIR, BASE_DIR, PKG_ROOT, CHANNELS_DIR, CHANNELS_MD, STATE_MD, CONFIG_JSON, ENV_PATH, profilePath,
 } from './lib/paths.ts';
-import { AGENTS, installSkill, projectSkillDir, customSkillDirDefault, isPackageDevCwd } from './lib/skill-install.ts';
+import { AGENTS, installSkills, projectSkillsRoot, customSkillsRootDefault, isPackageDevCwd } from './lib/skill-install.ts';
 import { question } from './lib/prompt.ts';
 import { normalizeHandle, slugify, serializeChannels, serializeState, profileBody, baselineStateRow } from './lib/channels.ts';
 
@@ -130,7 +130,7 @@ function main(): void {
   console.log('       1) Claude Code      2) Cursor      3) Custom folder (any other agent)\n');
   const agentKey = ask('  Your agent', '1');
   // For a custom target, ask the folder now (keeps all prompts in the interactive block).
-  const customDir = AGENTS[agentKey] ? '' : ask('  Folder to install the skill into', customSkillDirDefault());
+  const customDir = AGENTS[agentKey] ? '' : ask('  Skills folder to install into', customSkillsRootDefault());
 
   // 7. Write everything --------------------------------------------------------
   mkdirSync(CHANNELS_DIR, { recursive: true });
@@ -170,23 +170,23 @@ function main(): void {
   console.log(`    ${STATE_MD}`);
   console.log(`    ${channels.length} profile(s) in ${CHANNELS_DIR}/`);
 
-  // Install the /yt skill for the chosen agent (step 6), into THIS project — process.cwd(),
-  // i.e. wherever you ran the command (the package clone in dev, or your own project when the
-  // package is a dependency). The command baked in is the shipped `bun run src` only for the
-  // dev-in-clone case; otherwise the compiled `dist/` command (so a consumed package works).
+  // Install the /yt + /yt-transcribe skills for the chosen agent (step 6), into THIS project —
+  // process.cwd(), i.e. wherever you ran the command (the package clone in dev, or your own
+  // project when the package is a dependency). The command baked in is the shipped `bun run src`
+  // only for the dev-in-clone case; otherwise the compiled `dist/` command (so a consumed package works).
   const agent = AGENTS[agentKey];
   try {
-    const target = agent
-      ? installSkill(projectSkillDir(agentKey, process.cwd()), /* dist */ !isPackageDevCwd())
-      : installSkill(customDir, /* dist */ true);
-    console.log(`    /yt skill → ${target}`);
+    const targets = agent
+      ? installSkills(projectSkillsRoot(agentKey, process.cwd()), /* dist */ !isPackageDevCwd())
+      : installSkills(customDir, /* dist */ true);
+    for (const t of targets) console.log(`    skill → ${t}`);
   } catch (e) {
-    console.log(`  ! Couldn't install the skill (${(e as Error).message}) — run  yt-briefing install-skill  later.`);
+    console.log(`  ! Couldn't install the skills (${(e as Error).message}) — run  yt-briefing install-skill  later.`);
   }
 
   console.log('\n  Next:');
   console.log(`    1. Open this folder in ${agent ? agent.name : 'your agent'}.`);
-  console.log('    2. Start a new chat and type  /yt');
+  console.log('    2. Start a new chat and type  /yt  (or  /yt-transcribe <url>)');
   console.log('\n  No agent? Run it in the terminal instead — see the README.\n');
 }
 

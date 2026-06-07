@@ -64,8 +64,24 @@ npx yt-briefing list                                        # show the current l
 ## Run it
 
 Open your project in Claude Code or Cursor and run `/yt`. If it's not listed, start a fresh
-session. To install the skill again for another tool or project, run
-`npx yt-briefing install-skill`.
+session. To install the skills again for another tool or project, run
+`npx yt-briefing install-skill` (it installs both `/yt` and `/yt-transcribe`).
+
+## One-off: transcribe a single video
+
+Just want one video summarized — no channels, no queue, no rating? Run `/yt-transcribe` and
+paste a URL or video ID. It pulls that video's transcript and writes a journalist-grade
+summary in the language you chose at setup (the same `output_lang` as `/yt`). Want a one-off in
+another language? Just say so when you run it (e.g. `/yt-transcribe <url> in German`) — it
+won't change your setup. `--lang pl|en` is separate — it picks which caption track to fetch,
+not the summary language. Same transcript engine and proxy as the briefing loop, so on a
+server it benefits from the same [WARP proxy](#running-on-a-vps).
+
+The skill is installed alongside `/yt` by `init` / `install-skill`. From the plain CLI:
+
+```bash
+npx yt-briefing transcribe <url-or-id> --lang auto   # prints the transcript to stdout
+```
 
 ## Providers
 
