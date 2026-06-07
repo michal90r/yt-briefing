@@ -12,9 +12,9 @@
  * standalone command is for re-installing, a different project, or a second agent. There is
  * deliberately no home-global install — the skills live with the project that uses them.
  *
- * Both Claude Code and Cursor load `SKILL.md` skills and invoke them as `/<name>`.
- * Cursor also reads `.claude/skills/` for compatibility, so the copies this package already
- * ships often work in both — this command just (re)places them where you want.
+ * SKILL.md is the cross-agent Agent Skills standard, so the shipped skills run in any compatible
+ * agent (Claude Code, Cursor, Codex, and 30+ others); this command just (re)places them in the
+ * skills dir of whichever agent you pick.
  */
 
 import { AGENTS, installSkills, projectSkillsRoot, customSkillsRootDefault, isPackageDevCwd } from './lib/skill-install.ts';
@@ -31,8 +31,9 @@ function done(targets: string[]): void {
 // 1) which agent → which skills subdir
 console.log('\n  Install the /yt + /yt-transcribe skills — which agent?\n');
 console.log('    1) Claude Code');
-console.log('    2) Cursor   (also reads Claude\'s .claude/skills)');
-console.log('    3) Custom folder (any other agent)\n');
+console.log('    2) Cursor');
+console.log('    3) Codex');
+console.log('    4) Custom folder (any other compatible agent)\n');
 
 const agentKey = ask('  Agent', '1');
 const agent = AGENTS[agentKey];

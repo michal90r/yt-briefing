@@ -124,10 +124,11 @@ function main(): void {
   // 6. Coding agent ------------------------------------------------------------
   // Place the skill INTO THIS PROJECT (the package folder you open in the agent) — never a
   // home-global dir (that's the npm -g antipattern: machine-wide, invisible, easy to forget).
-  // Claude Code reads .claude/skills/ (already shipped here); Cursor reads .cursor/skills/.
-  // 1/2 = known agents; 3 = any other agent (a project folder you name).
-  console.log('\n  6) Which agent will you run /yt in?');
-  console.log('       1) Claude Code      2) Cursor      3) Custom folder (any other agent)\n');
+  // SKILL.md is the cross-agent standard, so the shipped skill runs in any compatible agent —
+  // we just install it into that agent's skills dir (.claude/skills, .cursor/skills, .codex/skills).
+  // 1/2/3 = known agents; 4 = any other compatible agent (a project folder you name).
+  console.log('\n  6) Which agent will you run /yt in?  (it ships a standard Agent Skill — any compatible agent works)');
+  console.log('       1) Claude Code   2) Cursor   3) Codex   4) Custom folder (any other agent)\n');
   const agentKey = ask('  Your agent', '1');
   // For a custom target, ask the folder now (keeps all prompts in the interactive block).
   const customDir = AGENTS[agentKey] ? '' : ask('  Skills folder to install into', customSkillsRootDefault());

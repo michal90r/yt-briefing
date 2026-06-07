@@ -46,10 +46,19 @@ export const isPackageDevCwd = (): boolean => isBun && resolve(process.cwd()) ==
 export const skillSource = (name: string): string =>
   join(PKG_ROOT, '.claude', 'skills', name, 'SKILL.md');
 
-/** Agent key → display name + the skills ROOT directory it scans (skills install under it). */
+/**
+ * Agent key → display name + the skills ROOT directory it scans (skills install under it).
+ *
+ * SKILL.md is the cross-agent Agent Skills standard (Anthropic, Dec 2025), now read by 30+
+ * tools that each scan their own `<agent-home>/skills/` dir. We only need the right directory
+ * per agent — the shipped SKILL.md works unmodified in all of them. The "custom folder" picker
+ * option (no AGENTS entry) covers every other compatible agent (Gemini CLI, Copilot, Windsurf…)
+ * and defaults to the neutral `.agents/skills/` location.
+ */
 export const AGENTS: Record<string, { name: string; sub: string }> = {
   '1': { name: 'Claude Code', sub: join('.claude', 'skills') },
   '2': { name: 'Cursor',      sub: join('.cursor', 'skills') },
+  '3': { name: 'Codex',       sub: join('.codex', 'skills') },
 };
 
 /**

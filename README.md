@@ -24,7 +24,8 @@ the last one left off.
 You'll need Node 18+ or Bun, a YouTube Data API v3 key, an LLM key (a
 [free Gemini key](https://aistudio.google.com/apikey) works, see [Providers](#providers)), and
 a tool that runs skills: [Claude Code](https://claude.com/claude-code),
-[Cursor](https://cursor.com), or anything else that loads `SKILL.md`.
+[Cursor](https://cursor.com), [Codex](https://developers.openai.com/codex), or anything else
+that loads the standard `SKILL.md` (Agent Skills — 30+ agents).
 
 1. Install yt-dlp (it pulls the subtitles):
 
@@ -128,9 +129,9 @@ summarizing the next video while you rate the current one, so the following step
 ready with no wait. An agent's turn-by-turn loop cannot prefetch like that, and every step pays
 its own cold start, which adds up across a whole queue.
 
-Compatibility. A standard API plus a small skill means one engine runs everywhere: Claude Code,
-Cursor, any other tool that loads a skill, or the plain CLI. A tool-native approach would tie it
-to that one tool and one model.
+Compatibility. A standard API plus a standard `SKILL.md` means one engine runs everywhere: Claude
+Code, Cursor, Codex, any other Agent-Skills-compatible tool, or the plain CLI. A tool-native
+approach would tie it to that one tool and one model.
 
 ## Why one transcript at a time
 

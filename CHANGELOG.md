@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `init` / `install-skill` now install three skills (`/yt`, `/yt-transcribe`, `/yt-search`).
+- Agent picker now offers **Codex** (`.codex/skills`) alongside Claude Code and Cursor. The
+  shipped `SKILL.md` is the cross-agent Agent Skills standard, so it runs unmodified in 30+
+  compatible agents; the "custom folder" option (default `.agents/skills/`) covers the rest.
 
 ## [0.4.0] - 2026-06-07
 
