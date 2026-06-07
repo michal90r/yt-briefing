@@ -28,7 +28,7 @@ import { PKG_ROOT, DATA_DIR } from './paths.ts';
 const DIST_DIR = join(PKG_ROOT, 'dist');
 
 /** The skills this package ships — each lives at `.claude/skills/<name>/SKILL.md`. */
-export const SKILLS = ['yt', 'yt-transcribe'] as const;
+export const SKILLS = ['yt', 'yt-transcribe', 'yt-search'] as const;
 
 /** True when the installer itself is running under Bun (vs plain Node). */
 export const isBun: boolean = (process.versions as { bun?: string }).bun != null;
@@ -71,6 +71,7 @@ export function skillBody(name: string, dist = false): string {
     .replace(/bun run src\/yt-sweep\.ts/g, cmd('yt-sweep'))
     .replace(/bun run src\/yt-rating\.ts/g, cmd('yt-rating'))
     .replace(/bun run src\/yt-transcript\.ts/g, cmd('yt-transcript'))
+    .replace(/bun run src\/yt-search\.ts/g, cmd('yt-search'))
     .replace(/data\//g, DATA_DIR + '/');
 }
 

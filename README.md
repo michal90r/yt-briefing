@@ -61,12 +61,6 @@ npx yt-briefing remove @handle                              # also deletes its l
 npx yt-briefing list                                        # show the current list
 ```
 
-## Run it
-
-Open your project in Claude Code or Cursor and run `/yt`. If it's not listed, start a fresh
-session. To install the skills again for another tool or project, run
-`npx yt-briefing install-skill` (it installs both `/yt` and `/yt-transcribe`).
-
 ## One-off: transcribe a single video
 
 Just want one video summarized — no channels, no queue, no rating? Run `/yt-transcribe` and
@@ -74,14 +68,38 @@ paste a URL or video ID. It pulls that video's transcript and writes a journalis
 summary in the language you chose at setup (the same `output_lang` as `/yt`). Want a one-off in
 another language? Just say so when you run it (e.g. `/yt-transcribe <url> in German`) — it
 won't change your setup. `--lang pl|en` is separate — it picks which caption track to fetch,
-not the summary language. Same transcript engine and proxy as the briefing loop, so on a
-server it benefits from the same [WARP proxy](#running-on-a-vps).
+not the summary language.
 
 The skill is installed alongside `/yt` by `init` / `install-skill`. From the plain CLI:
 
 ```bash
 npx yt-briefing transcribe <url-or-id> --lang auto   # prints the transcript to stdout
 ```
+
+## Research a topic across YouTube
+
+Want to know what YouTube says about something — and get an actual comparison, not a pile of
+links? Run `/yt-search` and describe the intent, e.g. `which terminal for coding with Claude
+Code`. The matching is **descriptive, not exact keywords**: an LLM turns your intent into search
+queries, then ranks the results against what you actually meant (on titles/descriptions — no
+transcripts yet). Then it hands you **one video at a time** with a rich summary; you **Keep** or
+**Skip** each. At the end it synthesizes a **comparison** from everything you kept.
+
+It's lazy on purpose — one transcript per step, never a burst (a burst gets your IP blocked, same
+as `/yt`). Summaries and the comparison use the language you chose at setup.
+
+```bash
+yt-briefing search "<intent>" [--max N] [--queries 1..3] [--since YYYY-MM-DD]   # JSON status line
+```
+
+> Each search calls the YouTube `search.list` endpoint, which costs **100 quota units per query**
+> (plain reads cost 1; the daily free quota is 10,000). `--queries` (default 2) caps how many.
+
+## Run it
+
+Open your project in Claude Code or Cursor and run `/yt`. If it's not listed, start a fresh
+session. To install the skills again for another tool or project, run
+`npx yt-briefing install-skill` (it installs `/yt`, `/yt-transcribe`, and `/yt-search`).
 
 ## Providers
 

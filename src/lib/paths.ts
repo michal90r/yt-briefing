@@ -54,6 +54,11 @@ export const PENDING_FILE = join(CACHE_DIR, 'pending.json');
 export const PREFETCH_FILE = join(CACHE_DIR, 'prefetch.json');
 export const LOG_FILE = join(CACHE_DIR, 'sweep.log');
 
+// /yt-search (ad-hoc topic search → lazy triage → compare). All throwaway, under .cache/.
+export const SEARCH_QUEUE_FILE = join(CACHE_DIR, 'search-queue.json');     // ranked candidates + cursor
+export const SEARCH_PENDING_FILE = join(CACHE_DIR, 'search-pending.json'); // current candidate awaiting keep/skip
+export const SEARCH_KEPT_FILE = join(CACHE_DIR, 'search-kept.json');       // kept mega-summaries → compare corpus
+
 /** Absolute path to a channel profile from its slug. */
 export const profilePath = (slug: string): string => join(CHANNELS_DIR, `${slug}.md`);
 

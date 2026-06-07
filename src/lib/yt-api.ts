@@ -127,6 +127,47 @@ async function enrichWithTypes(videos: Video[]): Promise<Video[]> {
   return out;
 }
 
+/** A search.list hit — carries the snippet fields a relevance re-rank needs (no transcript yet). */
+export interface SearchHit {
+  videoId: string;
+  title: string;
+  channelTitle: string;
+  publishedAt: string;
+  description: string;
+}
+
+/**
+ * Free-text video search via `search.list`. YouTube ranks by relevance, so the query can be
+ * descriptive — no exact keyword match required. NOTE: search.list costs 100 quota units per
+ * call (plain reads cost 1), so callers should keep the number of queries small.
+ *
+ * `since` (ISO date) maps to publishedAfter — useful to cut stale results on fast-moving topics.
+ */
+export async function searchVideos(
+  query: string,
+  opts: { maxResults?: number; since?: string | null } = {},
+): Promise<SearchHit[]> {
+  const { maxResults = 10, since = null } = opts;
+  const params: Record<string, string> = {
+    part: 'snippet',
+    q: query,
+    type: 'video',
+    order: 'relevance',
+    maxResults: String(Math.min(Math.max(maxResults, 1), 50)),
+  };
+  if (since) params.publishedAfter = new Date(since).toISOString();
+  const data = await get('search', params);
+  return (data.items || [])
+    .filter((it: any) => it.id?.videoId)
+    .map((it: any) => ({
+      videoId: it.id.videoId,
+      title: it.snippet?.title ?? '',
+      channelTitle: it.snippet?.channelTitle ?? '',
+      publishedAt: it.snippet?.publishedAt ?? '',
+      description: it.snippet?.description ?? '',
+    }));
+}
+
 /**
  * List a channel's uploads (newest first). With `enrich` (default true) each video is
  * typed (short/live/longform) and current/upcoming live broadcasts are filtered out.

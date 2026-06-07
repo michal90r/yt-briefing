@@ -12,6 +12,7 @@
  *   yt-briefing sweep [--reset]            advance one step; prints a JSON status line
  *   yt-briefing rate --rating 0|1 [...]    record a rating for the pending video
  *   yt-briefing transcribe <url|id>        print a single video's transcript
+ *   yt-briefing search "<intent>" [...]    topic search → lazy triage → compare (JSON status line)
  */
 
 import { spawnSync } from 'node:child_process';
@@ -27,6 +28,7 @@ const TARGETS: Record<string, string> = {
   sweep: 'yt-sweep',
   rate: 'yt-rating',
   transcribe: 'yt-transcript',
+  search: 'yt-search',
 };
 const CHANNEL_ACTIONS = new Set(['add', 'remove', 'list']);
 
@@ -35,7 +37,7 @@ if (cmd && CHANNEL_ACTIONS.has(cmd)) argv = [script('yt-channels'), cmd, ...rest
 else if (cmd && TARGETS[cmd]) argv = [script(TARGETS[cmd]!), ...rest];
 
 if (!argv) {
-  console.error('Usage: yt-briefing <init|install-skill|add|remove|list|sweep|rate|transcribe> [args...]');
+  console.error('Usage: yt-briefing <init|install-skill|add|remove|list|sweep|rate|transcribe|search> [args...]');
   process.exit(cmd ? 1 : 0);
 }
 

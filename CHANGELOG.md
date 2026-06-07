@@ -5,6 +5,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-07
+
+### Added
+- `/yt-search` skill + `yt-briefing search "<intent>"` CLI: research a topic across YouTube.
+  Describe an intent (descriptive, not exact-keyword) → LLM expands it into search queries →
+  `search.list` → LLM re-ranks results against the intent on metadata only (no transcripts) →
+  **lazy** one-video-at-a-time triage with a rich summary (Keep/Skip) → synthesizes a comparison
+  from everything kept. Lazy by design — one transcript per step, never a burst (avoids IP blocks).
+- `searchVideos()` in the YouTube API client (`search.list`, relevance-ranked, `publishedAfter`).
+
+### Changed
+- `init` / `install-skill` now install three skills (`/yt`, `/yt-transcribe`, `/yt-search`).
+
 ## [0.4.0] - 2026-06-07
 
 ### Added
@@ -64,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[0.5.0]: https://github.com/michal90r/yt-briefing/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/michal90r/yt-briefing/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/michal90r/yt-briefing/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/michal90r/yt-briefing/compare/v0.3.0...v0.3.1
