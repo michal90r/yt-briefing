@@ -22,7 +22,7 @@
  *   Docker). See docs/warp-proxy.md.
  */
 
-import { spawnSync } from 'node:child_process';
+import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -97,6 +97,7 @@ const ytdlpArgs = [
   '--sub-langs', subLangs,
   '--sub-format', 'vtt',
   '--ignore-errors',   // continue if one language track fails (e.g. 429 on pl for en-only video)
+  '--extractor-retries', '3', // yt-dlp's own retry on the extractor-level bot-check / 429
   '--no-warnings',
   '--quiet',
   '-o', outTemplate,
@@ -104,7 +105,23 @@ const ytdlpArgs = [
 if (proxyUrl) ytdlpArgs.push('--proxy', proxyUrl);
 ytdlpArgs.push(`https://www.youtube.com/watch?v=${videoId}`);
 
-const result = spawnSync(YT_DLP, ytdlpArgs, { encoding: 'utf8', timeout: 60_000 });
+// The first request through a cold WARP/shared egress IP intermittently trips YouTube's
+// "Sign in to confirm you're not a bot" check; the very next request seconds later succeeds
+// (the extractor session warms up). Without a retry that transient flake exits 2, which the
+// sweep treats as fatal (emit → exit) — so a cold `/yt` needed two calls to get going. Retry
+// ONLY on rate-limit-with-no-subtitles: a genuine IP block still exhausts the attempts and
+// exits 2, and real tooling errors / captionless videos fall straight through untouched.
+const sleepSync = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+let result!: SpawnSyncReturns<string>;
+for (let attempt = 1; attempt <= 3; attempt++) {
+  result = spawnSync(YT_DLP, ytdlpArgs, { encoding: 'utf8', timeout: 60_000 });
+  if (result.error) break; // spawn / ENOENT — retrying won't help
+  const stderr = (result.stderr ?? '').toLowerCase();
+  const limited = stderr.includes('sign in') || stderr.includes('429') || stderr.includes('too many') || stderr.includes('captcha');
+  const gotSubs = existsSync(tmpDir) && readdirSync(tmpDir).some(f => f.endsWith('.vtt'));
+  if (gotSubs || !limited) break;             // success, or a non-rate-limit outcome → stop
+  if (attempt < 3) sleepSync(attempt * 2000); // 2s, then 4s backoff between cold retries
+}
 
 const cleanup = () => { try { rmSync(tmpDir, { recursive: true }); } catch {} };
 

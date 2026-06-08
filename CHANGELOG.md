@@ -5,6 +5,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] - 2026-06-08
+
+### Fixed
+- **A cold sweep no longer returns `rate_limited` on the first call.** The first transcript
+  fetch through a freshly-warmed WARP/shared egress IP intermittently trips YouTube's "Sign in
+  to confirm you're not a bot" check; the next request seconds later succeeds. That transient
+  flake exited `2`, which the sweep treats as fatal (`emit` → exit) — so a cold `/yt` needed two
+  calls to get going. `yt-transcript` now retries up to 3 times with a 2s/4s backoff, but **only**
+  on rate-limit-with-no-subtitles: a genuine IP block still exhausts the attempts and exits `2`,
+  and real tooling errors / captionless videos fall straight through untouched. Also passes
+  `--extractor-retries 3` so yt-dlp retries the bot-check at the extractor level first.
+
 ## [0.11.0] - 2026-06-08
 
 ### Changed (BREAKING)
