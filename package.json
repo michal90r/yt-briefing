@@ -22,7 +22,8 @@
     "sweep": "bun run src/yt-sweep.ts",
     "rate": "bun run src/yt-rating.ts",
     "transcribe": "bun run src/yt-transcript.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "engines": {
     "node": ">=18",
@@ -51,6 +52,7 @@
   "devDependencies": {
     "@types/node": "^22",
     "typescript": "^5.7",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "vitest": "^3"
   }
 }
