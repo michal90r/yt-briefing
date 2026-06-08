@@ -1,11 +1,11 @@
 # yt-briefing
 
-Save hours on YouTube. yt-briefing watches the channels you follow so you don't have to. It
-turns each new video into a short summary in your own language that keeps what matters and
-skips the filler. Reading it takes a fraction of the time the video would, so you stay on top
-of everything and only watch what's actually worth it.
+Save hours on YouTube. yt-briefing watches the channels you follow so you don't have to. For
+each new video it distills the essence in your own language — every point that matters, with
+only the filler cut, so nothing important is lost. Reading it takes a fraction of the time the
+video would, so you stay on top of everything and only watch what's actually worth it.
 
-It also gets better the more you use it. You give each summary a quick rating, worth my time
+It also gets better the more you use it. You give each briefing a quick rating, worth my time
 or not, and from that it learns what to keep showing you and what to drop. Over time the queue
 becomes yours: less noise, more of what you care about.
 
@@ -46,13 +46,26 @@ yarn add yt-briefing
 bun  add yt-briefing
 ```
 
-3. Onboard:
+3. Put your keys in a `.env` at your project root — all four are required:
+
+```ini
+YT_BRIEFING_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+YT_BRIEFING_LLM_API_KEY=<key>        # free at https://aistudio.google.com/apikey
+YT_BRIEFING_LLM_MODEL=gemini-2.5-flash
+YT_BRIEFING_YOUTUBE_API_KEY=<key>    # console.cloud.google.com → enable "YouTube Data API v3"
+```
+
+Any OpenAI-compatible endpoint works — see [Providers](#providers) to use OpenRouter, OpenAI, or a
+local Ollama instead of Gemini. Miss a key and the engine tells you exactly which one. Keep `.env`
+gitignored; `YT_BRIEFING_PROXY` (datacenter/VPS IPs) is the only optional extra.
+
+4. Onboard:
 
 ```bash
 npx yt-briefing init      # or: bunx yt-briefing init
 ```
 
-`init` asks for your language, your keys, the channels to follow, and which tool runs `/yt`.
+`init` asks for your language, the channels to follow, and which tool runs `/yt`.
 
 Add or remove channels anytime:
 
@@ -110,24 +123,8 @@ YT_BRIEFING_LLM_MODEL=gemini-2.5-flash
 > or switch to a paid key (enable billing, same model) to avoid it.
 
 Want something else? Change those three lines for OpenRouter (`https://openrouter.ai/api/v1`),
-OpenAI (`https://api.openai.com/v1`), or a local Ollama (`http://localhost:11434/v1`).
-
-### Where the keys live
-
-Keys are read from your project's **root `.env`** only — there is no fallback file. Put them there
-(or export them in the shell / CI — an exported var wins). `bun run init` writes them into your
-root `.env`, merging without clobbering any other variables already in it.
-
-These are **required**, and missing one fails fast naming exactly which (no silent defaults):
-
-```ini
-YT_BRIEFING_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-YT_BRIEFING_LLM_API_KEY=<your-key>
-YT_BRIEFING_LLM_MODEL=gemini-2.5-flash
-YT_BRIEFING_YOUTUBE_API_KEY=<your-key>
-```
-
-`YT_BRIEFING_PROXY` and `YT_BRIEFING_DLP_PATH` are optional. Keep `.env` gitignored.
+OpenAI (`https://api.openai.com/v1`), or a local Ollama (`http://localhost:11434/v1`). Set
+`YT_BRIEFING_LLM_BASE_URL`, `_API_KEY`, and `_MODEL` in your root `.env` (see [Setup](#setup)).
 
 ## Why an API, not the agent's native model
 

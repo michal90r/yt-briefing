@@ -5,6 +5,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-06-08
+
+### Changed
+- **`init` no longer asks for keys or touches `.env`.** The wizard now sets only your output
+  language, the channels to follow, and which agent runs `/yt`. Put `YT_BRIEFING_*` (the LLM vars
+  and the YouTube key) in your project root `.env` yourself — see README → Setup — and the engine
+  reads them at run time, failing fast naming any that are missing.
+
 ## [0.7.0] - 2026-06-08
 
 ### Changed (BREAKING)
@@ -121,6 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[0.8.0]: https://github.com/michal90r/yt-briefing/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/michal90r/yt-briefing/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/michal90r/yt-briefing/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/michal90r/yt-briefing/compare/v0.4.0...v0.5.0
