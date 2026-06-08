@@ -13,19 +13,35 @@
  * agent's cwd IS the package folder AND the runtime is Bun (which runs TypeScript directly).
  * That's true for the publisher's own day-to-day use, so it stays the default.
  *
- * For everyone else — a Node user, or any install whose cwd won't be the package — we bake an
- * absolute, runtime-correct command instead: `"<this runtime>" "<abs>/dist/X.js"`. The runtime
- * is `process.execPath` of whoever runs the installer (so `init` under Node bakes node, under
- * Bun bakes bun), and it points at the compiled build, so it runs from any cwd. The engine
- * resolves data/.env from its own location regardless. (Requires `dist/` — build once with
- * `bun run build` / `npm run build`; that's exactly how a Node user already got here.)
+ * For everyone else — a Node user, or any install whose cwd won't be the package — we rewrite to
+ * a PORTABLE command: `<runtime> "<project-relative>/dist/X.js"`. The runtime is the bare name
+ * (`node`/`bun`) resolved from PATH, never an absolute binary; the script and `data/` paths are
+ * relative to the PROJECT ROOT, never machine-absolute. The invariant this rests on is the same
+ * one the whole package already relies on (paths.ts derives BASE_DIR/DATA_DIR from
+ * `process.cwd()` when consumed): the agent runs from the project root. So the rewritten skill is
+ * machine-independent — it survives being committed to git and shared across machines (e.g. a
+ * Mac dev box and a Linux VPS), which an absolute `process.execPath`/`<abs>/dist` baking did not.
+ * (Requires `dist/` — build once with `bun run build` / `npm run build`.)
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { PKG_ROOT, DATA_DIR } from './paths.ts';
+import { join, resolve, relative, dirname, sep } from 'node:path';
+import { PKG_ROOT, BASE_DIR, DATA_DIR } from './paths.ts';
 
-/** Compiled output dir — what a baked (dist) skill command points the runtime at. */
+/** Compiled output dir — what a rewritten (dist) skill command points the runtime at. */
 const DIST_DIR = join(PKG_ROOT, 'dist');
+
+/** Consumed as a dependency? Then PKG_ROOT lives under node_modules (mirrors paths.ts). */
+const CONSUMED = PKG_ROOT.split(sep).includes('node_modules');
+
+/**
+ * The project root the agent runs from — the cwd against which the rewritten skill's relative
+ * paths resolve. When consumed, that's the user's project (parent of `<project>/.yt-briefing`);
+ * in a clone it's the package itself. Matches how paths.ts picks BASE_DIR.
+ */
+const PROJECT_ROOT = CONSUMED ? dirname(BASE_DIR) : PKG_ROOT;
+
+/** An absolute path expressed relative to PROJECT_ROOT, with POSIX `/` (portable on Windows too). */
+const toProjectRel = (abs: string): string => relative(PROJECT_ROOT, abs).split(sep).join('/');
 
 /** The skills this package ships — each lives at `.claude/skills/<name>/SKILL.md`. */
 export const SKILLS = ['yt', 'yt-transcribe', 'yt-search'] as const;
@@ -64,24 +80,25 @@ export const AGENTS: Record<string, { name: string; sub: string }> = {
 /**
  * One shipped skill's SKILL.md. `dist=false` (default) returns it verbatim — the
  * `bun run src/X.ts` dev form, correct only when cwd is the package AND the runtime is Bun.
- * `dist=true` rewrites for the consumed case: engine commands become
- * `"<process.execPath>" "<abs>/dist/X.js"` (this machine's runtime, Node or Bun, against the
- * compiled build, so they run from any cwd), and the bare `data/…` paths the agent reads (e.g.
- * `data/config.json`) become the absolute `DATA_DIR`. In dev the agent's cwd IS the package so
- * `data/` resolves; when consumed, DATA_DIR moves to `<project>/.yt-briefing/data`, so the
- * dev-relative paths would miss — hence the rewrite.
+ * `dist=true` rewrites for the consumed case into PORTABLE, project-relative form: engine
+ * commands become `<node|bun> "<rel>/dist/X.js"` (bare runtime from PATH + a path relative to the
+ * project root, so they run on any machine from the project cwd), and the bare `data/…` paths the
+ * agent reads (e.g. `data/config.json`) become the project-relative DATA_DIR (`.yt-briefing/data/`
+ * when consumed). Nothing machine-absolute is baked, so the rewritten skill can be committed and
+ * shared across machines. The runtime name follows whoever runs the installer (Node→`node`,
+ * Bun→`bun`); the compiled `dist/` build runs under either.
  */
 export function skillBody(name: string, dist = false): string {
   const raw = readFileSync(skillSource(name), 'utf8');
   if (!dist) return raw;
-  const exe = process.execPath;
-  const cmd = (base: string): string => `"${exe}" "${join(DIST_DIR, base + '.js')}"`;
+  const runtime = isBun ? 'bun' : 'node';
+  const cmd = (base: string): string => `${runtime} "${toProjectRel(join(DIST_DIR, base + '.js'))}"`;
   return raw
     .replace(/bun run src\/yt-sweep\.ts/g, cmd('yt-sweep'))
     .replace(/bun run src\/yt-rating\.ts/g, cmd('yt-rating'))
     .replace(/bun run src\/yt-transcript\.ts/g, cmd('yt-transcript'))
     .replace(/bun run src\/yt-search\.ts/g, cmd('yt-search'))
-    .replace(/data\//g, DATA_DIR + '/');
+    .replace(/data\//g, toProjectRel(DATA_DIR) + '/');
 }
 
 /**
