@@ -1,0 +1,51 @@
+# Reusable CI core — one definition, called once per OS by the thin ci-mac / ci-ubuntu /
+# ci-windows workflows (so each OS gets its own status badge). Runs the full check matrix
+# across BOTH runtimes (Node + Bun), proving the cross-runtime claim on every platform.
+#
+# The smoke tests are hermetic (pure functions, no network), so nothing here touches YouTube —
+# CI/VPS IP blocks are irrelevant and runs are 100% deterministic.
+name: ci-core
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+
+jobs:
+  check:
+    runs-on: ${{ inputs.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [node, bun]
+    name: ${{ matrix.runtime }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # ---- Node runtime ----
+      - if: matrix.runtime == 'node'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - if: matrix.runtime == 'node'
+        run: npm install
+      - if: matrix.runtime == 'node'
+        run: npm run typecheck
+      - if: matrix.runtime == 'node'
+        run: npm run build
+      - if: matrix.runtime == 'node'
+        run: npx vitest run
+
+      # ---- Bun runtime ----
+      - if: matrix.runtime == 'bun'
+        uses: oven-sh/setup-bun@v2
+      - if: matrix.runtime == 'bun'
+        run: bun install
+      - if: matrix.runtime == 'bun'
+        run: bun run typecheck
+      - if: matrix.runtime == 'bun'
+        run: bun run build
+      - if: matrix.runtime == 'bun'
+        run: bun test

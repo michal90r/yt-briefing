@@ -1,0 +1,13 @@
+# Per-OS caller → its own status badge (label = "windows"). Real logic lives in ci-core.yml.
+name: windows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci-core.yml
+    with:
+      os: windows-latest
