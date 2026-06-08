@@ -5,6 +5,22 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-06-08
+
+### Changed (BREAKING)
+- **`/yt-search` now ranks the channel's whole upload history** — not just a recent window. The
+  `--scan` (recent-uploads cap, default 50) and `--since` (date window) flags are **removed**;
+  **`--top N` (default 10) is the only flag**, capping how many of the top re-ranked matches get
+  triaged. Searching a busy channel (e.g. ~3 uploads/day) used to miss everything older than ~18
+  days; a query for "which terminal for AI coding" now surfaces the relevant videos from across
+  years, not just the last fortnight.
+
+### Fixed
+- **Re-rank is chunked, so the full history can't overflow the LLM.** A years-old channel is 1000+
+  uploads (~300 KB of titles+descriptions); sending that as one prompt silently overflowed context
+  → the parse failed → the keep-all fallback walked every transcript newest-first. The pool is now
+  ranked in chunks and merged by score, and a failed chunk is dropped (not dumped unranked).
+
 ## [0.10.0] - 2026-06-08
 
 ### Fixed
@@ -161,6 +177,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[0.11.0]: https://github.com/michal90r/yt-briefing/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/michal90r/yt-briefing/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/michal90r/yt-briefing/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/michal90r/yt-briefing/compare/v0.9.0...v0.9.1

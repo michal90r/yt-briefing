@@ -5,8 +5,9 @@
  *
  * You point it at a channel and describe what you're after ("which terminal does he recommend
  * for AI coding"); the engine:
- *   1. lists that channel's uploads (cheap — playlistItems, 1 quota unit/page; NOT search.list),
- *   2. re-ranks them against your intent on metadata only — title/description, NO transcript yet,
+ *   1. lists that channel's FULL upload history (cheap — playlistItems, 1 quota unit/page; NOT search.list),
+ *   2. re-ranks it against your intent on metadata only — title/description, NO transcript yet
+ *      (the history is ranked in chunks and merged, so a 1000+ video channel never overflows the LLM),
  *   3. yields ONE matching video at a time with a rich summary, lazily — never a burst of
  *      transcript fetches (a burst looks like scraping and gets the IP blocked),
  *   4. records your keep/skip decision; kept summaries accumulate in a cache,
@@ -16,7 +17,7 @@
  * the channel's videos by intent (no exact-keyword needed).
  *
  * Usage (the skill / CLI drives these; one JSON line per call):
- *   yt-search "<intent>" --channel <@handle|url> [--reset] [--top N] [--scan N] [--since DATE] [--lang auto]
+ *   yt-search "<intent>" --channel <@handle|url> [--reset] [--top N] [--lang auto]
  *   yt-search --keep        record the pending candidate, advance, yield next
  *   yt-search --skip        drop the pending candidate, advance, yield next
  *   yt-search --compare     synthesize a comparison from everything kept
@@ -52,7 +53,7 @@ const RUNTIME = process.execPath;
 const LANG = outputLang();
 
 const argv = process.argv.slice(2);
-const VALUE_FLAGS = new Set(['--channel', '--top', '--scan', '--since', '--lang']);
+const VALUE_FLAGS = new Set(['--channel', '--top', '--lang']);
 const has = (f: string) => argv.includes(f);
 const flagVal = (f: string): string | null => {
   const i = argv.indexOf(f);
@@ -76,8 +77,6 @@ const SKIP = has('--skip');
 const COMPARE = has('--compare');
 const CHANNEL = flagVal('--channel');
 const TOP = Math.max(1, parseInt(flagVal('--top') || '10', 10));
-const SCAN = Math.max(1, parseInt(flagVal('--scan') || '50', 10));   // recent uploads to consider when no --since
-const SINCE = flagVal('--since');
 const LANGTRACK = flagVal('--lang') || 'auto';
 
 interface Candidate { videoId: string; title: string; channelTitle: string; publishedAt: string; description?: string; score?: number; reason?: string; }
@@ -117,8 +116,13 @@ function parseJsonArray(out: string): any[] | null {
   try { return JSON.parse(out.slice(start, end + 1)); } catch { return null; }
 }
 
-/** Re-rank a channel's videos against the intent (metadata only — no transcript). */
-async function rerank(intent: string, items: Candidate[]): Promise<Candidate[]> {
+// The whole channel history is ranked, so the pool can be large (a years-old channel is 1000+
+// uploads). One LLM prompt would overflow context, so the pool is ranked in chunks and merged.
+const RERANK_CHUNK = 200;
+
+/** Re-rank ONE chunk against the intent (metadata only). Returns [] on a parse/LLM failure so a
+ *  bad chunk is dropped rather than flooding the queue with unranked videos. */
+async function rerankBatch(intent: string, items: Candidate[]): Promise<Candidate[]> {
   if (items.length === 0) return [];
   const compact = items.map(h => ({ id: h.videoId, title: h.title, published: h.publishedAt, desc: (h.description || '').slice(0, 280) }));
   const prompt = `From this YouTube channel's videos, pick the ones that serve the user's intent and rank them. Judge on title + description only (no transcripts). Drop anything off-topic.
@@ -134,7 +138,7 @@ Set keep=false for anything not relevant to the intent.`;
   try {
     const out = await chat(prompt, { system: 'You output ONLY a raw JSON array as instructed.', temperature: 0 });
     const arr = parseJsonArray(out);
-    if (!arr) return items;   // fall back: keep all, original (newest-first) order
+    if (!arr) return [];
     const byId = new Map(items.map(h => [h.videoId, h]));
     const ranked: Candidate[] = [];
     for (const r of arr) {
@@ -142,10 +146,23 @@ Set keep=false for anything not relevant to the intent.`;
       const h = byId.get(r.id);
       if (h) ranked.push({ ...h, score: typeof r.score === 'number' ? r.score : undefined, reason: r.reason });
     }
-    return ranked.length ? ranked : items;
+    return ranked;
   } catch {
-    return items;
+    return [];
   }
+}
+
+/** Re-rank the channel's full history against the intent: chunk the pool, rank each chunk, merge
+ *  the keepers globally by score (highest first), dedup by id. */
+async function rerank(intent: string, items: Candidate[]): Promise<Candidate[]> {
+  if (items.length === 0) return [];
+  const merged: Candidate[] = [];
+  for (let i = 0; i < items.length; i += RERANK_CHUNK) {
+    merged.push(...await rerankBatch(intent, items.slice(i, i + RERANK_CHUNK)));
+  }
+  const byId = new Map<string, Candidate>();
+  for (const c of merged) if (!byId.has(c.videoId)) byId.set(c.videoId, c);
+  return [...byId.values()].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
 }
 
 /** Rich, standalone summary for one candidate — the triage artifact + compare input. */
@@ -267,7 +284,7 @@ async function main(): Promise<void> {
 
   let videos: Video[];
   try {
-    videos = await fetchChannelVideos(handle, { since: SINCE, limit: SINCE ? null : SCAN, enrich: false });
+    videos = await fetchChannelVideos(handle, { limit: null, enrich: false });   // full channel history
   } catch (e) {
     emit({ status: 'error', error: (e as Error).message });
   }

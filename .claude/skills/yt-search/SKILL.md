@@ -1,12 +1,12 @@
 ---
 name: yt-search
 description: Search WITHIN one YouTube channel by intent — name a channel and what you're after; the engine lists that channel's uploads, ranks them against your intent (metadata only, no transcript yet), then lazily yields ONE matching video at a time with a rich summary. You keep or skip each; at the end it synthesizes a comparison from everything you kept. Channel-scoped, not whole-YouTube. Same transcript engine + proxy as /yt; lazy on purpose (no transcript bursts → no IP block). Summaries and prompts use the language chosen at onboarding.
-argument-hint: A channel (@handle or URL) and a descriptive intent, e.g. "@t3dotgg which terminal for AI coding". Optional --top N (default 10), --scan N, --since YYYY-MM-DD.
+argument-hint: A channel (@handle or URL) and a descriptive intent, e.g. "@t3dotgg which terminal for AI coding". Searches the channel's whole upload history. Optional --top N (default 10).
 ---
 
 ## How it works
 
-`src/yt-search.ts` is the whole engine: list one channel's uploads (cheap — `playlistItems`, ~1 quota unit/page; NOT `search.list`) → re-rank them against your intent on metadata only (title/description, no transcript) → **lazy** one-candidate-at-a-time yield with a rich summary → record keep/skip → on demand synthesize a comparison from everything kept. **Channel-scoped on purpose** — you choose where to look; it does NOT search all of YouTube. Matching is descriptive: the LLM filters the channel's videos by intent. This skill is a thin loop — paste the summary, collect keep/skip, show the final comparison.
+`src/yt-search.ts` is the whole engine: list the channel's **full upload history** (cheap — `playlistItems`, ~1 quota unit/page; NOT `search.list`) → re-rank it against your intent on metadata only (title/description, no transcript; ranked in chunks and merged so a 1000+ video channel never overflows the LLM) → **lazy** one-candidate-at-a-time yield with a rich summary → record keep/skip → on demand synthesize a comparison from everything kept. **Channel-scoped on purpose** — you choose where to look; it does NOT search all of YouTube. Matching is descriptive: the LLM filters the channel's videos by intent. This skill is a thin loop — paste the summary, collect keep/skip, show the final comparison.
 
 **Lazy on purpose:** one transcript per step, never a burst — a burst looks like scraping and gets the IP blocked (same reason `/yt` is lazy). Run the engine bare — stdout is a single JSON line, stderr empty; never redirect.
 
@@ -53,5 +53,5 @@ while true:
 
 - **Verbatim:** paste `summary` and `comparison` exactly as returned; never paste a raw transcript.
 - **Language:** question text + option descriptions follow `output_lang`; button labels stay `Keep` / `Skip`.
-- **Scope:** one channel per search. Listing is cheap; the cost is the lazy transcript fetches, so let the user keep/skip rather than pulling everything. A bare resume (no `--reset`) continues the same ranked queue. `--scan N` (default 50) caps how many recent uploads are considered; `--since` widens by date.
+- **Scope:** one channel per search, ranked across its **whole upload history**. Listing is cheap; the cost is the lazy transcript fetches, so let the user keep/skip rather than pulling everything. A bare resume (no `--reset`) continues the same ranked queue. `--top N` (default 10) caps how many of the top re-ranked matches get triaged — it is the only flag.
 - **Stateless triage:** independent of `/yt` (no channel profiles, no ratings written). For the recurring multi-channel briefing use `/yt`; for one known video use `/yt-transcribe`.
