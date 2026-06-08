@@ -50,16 +50,16 @@
 
 import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, renameSync, appendFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import dotenv from 'dotenv';
+import { loadEnv } from './lib/env.ts';
 import { parseChannels, parseState, bumpStatePointer } from './lib/yt-lib.ts';
 import { chat, getModel } from './lib/llm.ts';
 import { outputLang } from './lib/config.ts';
 import {
-  PKG_ROOT, ENV_PATH, CHANNELS_MD, STATE_MD, CACHE_DIR,
+  PKG_ROOT, CHANNELS_MD, STATE_MD, CACHE_DIR,
   QUEUE_FILE, REST_FILE, PENDING_FILE, PREFETCH_FILE, LOG_FILE, profilePath, script,
 } from './lib/paths.ts';
 
-dotenv.config({ path: ENV_PATH });
+loadEnv();
 mkdirSync(CACHE_DIR, { recursive: true });
 
 // Re-invoke sibling scripts with the SAME runtime that launched us (bun/node/deno),

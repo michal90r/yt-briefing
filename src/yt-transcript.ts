@@ -26,12 +26,12 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import dotenv from 'dotenv';
-import { CACHE_DIR, ENV_PATH } from './lib/paths.ts';
+import { loadEnv } from './lib/env.ts';
+import { CACHE_DIR } from './lib/paths.ts';
 
 // Load .env so YT_BRIEFING_PROXY is set when run standalone under Node (Bun auto-loads it; Node doesn't).
 // When spawned by yt-sweep, the parent already loaded it and the child inherits the env.
-dotenv.config({ path: ENV_PATH });
+loadEnv();
 
 /** Resolve the yt-dlp binary: explicit env → project-local ./bin → PATH (Windows-aware). */
 function resolveYtDlp(): string {

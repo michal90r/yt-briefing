@@ -20,6 +20,7 @@ import {
   DATA_DIR, BASE_DIR, PKG_ROOT, CHANNELS_DIR, CHANNELS_MD, STATE_MD, CONFIG_JSON, ENV_PATH, profilePath,
 } from './lib/paths.ts';
 import { AGENTS, installSkills, projectSkillsRoot, customSkillsRootDefault, isPackageDevCwd } from './lib/skill-install.ts';
+import { loadEnv } from './lib/env.ts';
 import { question } from './lib/prompt.ts';
 import { normalizeHandle, slugify, serializeChannels, serializeState, profileBody, baselineStateRow } from './lib/channels.ts';
 
@@ -32,11 +33,30 @@ const askYN = (q: string, def = true): boolean => {
   if (!a) return def;
   return a.startsWith('y');
 };
+// Secrets: if already provided by the environment (root .env or an exported var), offer to keep it
+// without echoing the value back to the terminal. Returns the kept/typed value.
+const askSecret = (q: string, preset: string): string => {
+  if (preset) return question(`${q} [Enter = keep the value from your environment]:`).trim() || preset;
+  return ask(q);
+};
+// A secret the env already supplies is NOT re-written into the fallback .yt-briefing/.env — that
+// would leave a second, shadowed copy that drifts. We emit a comment instead, keeping one source.
+const envLine = (key: string, value: string, preset: string): string =>
+  value && value === preset
+    ? `# ${key} — provided by your environment (root .env / shell)`
+    : `${key}=${value}`;
 
 interface ChannelInput { handle: string; slug: string; }
 
 function main(): void {
   console.log('\n  yt-briefing — onboarding\n  ' + '─'.repeat(40) + '\n');
+
+  // See what the environment already provides (root .env / exported vars) so we can offer to keep
+  // those secrets instead of re-asking, and avoid baking a second copy into .yt-briefing/.env.
+  loadEnv();
+  const presetLlmKey = process.env.YT_BRIEFING_LLM_API_KEY ?? '';
+  const presetYtKey = process.env.YT_BRIEFING_YOUTUBE_API_KEY ?? '';
+  const presetProxy = process.env.YT_BRIEFING_PROXY ?? '';
 
   if (existsSync(CHANNELS_MD)) {
     console.log(`  Existing data found at ${DATA_DIR}`);
@@ -72,22 +92,22 @@ function main(): void {
   const picked = PROVIDERS[ask('  Your choice', '1')];
   if (picked) {
     console.log(`\n     → ${picked.name}. Get your key here: ${picked.keyUrl}`);
-    llmKey = ask('  Paste your API key');
+    llmKey = askSecret('  Paste your API key', presetLlmKey);
     llmBaseUrl = picked.base;
     llmModel = ask('  Model (Enter to accept)', picked.model);
   } else {
     console.log('\n     → Custom / local endpoint (e.g. Ollama at http://localhost:11434/v1)');
     llmBaseUrl = ask('  YT_BRIEFING_LLM_BASE_URL', 'http://localhost:11434/v1');
     llmModel = ask('  YT_BRIEFING_LLM_MODEL', 'llama3.1');
-    llmKey = ask('  YT_BRIEFING_LLM_API_KEY (blank for local)', '');
+    llmKey = askSecret('  YT_BRIEFING_LLM_API_KEY (blank for local)', presetLlmKey);
   }
 
   console.log('\n  3) YouTube Data API (needed to list channel uploads)');
   console.log('     Get a key: https://console.cloud.google.com → YouTube Data API v3');
-  const ytKey = ask('  YT_BRIEFING_YOUTUBE_API_KEY');
+  const ytKey = askSecret('  YT_BRIEFING_YOUTUBE_API_KEY', presetYtKey);
 
   console.log('\n  4) Proxy (optional — only needed on datacenter/VPS IPs; see docs/warp-proxy.md)');
-  const ytProxy = ask('  YT_BRIEFING_PROXY (blank = direct)', '');
+  const ytProxy = askSecret('  YT_BRIEFING_PROXY (blank = direct)', presetProxy);
 
   // 5. Channels ----------------------------------------------------------------
   // Just collect a flat list. No categories, no per-channel rules to define up front —
@@ -136,13 +156,14 @@ function main(): void {
   // 7. Write everything --------------------------------------------------------
   mkdirSync(CHANNELS_DIR, { recursive: true });
 
-  // .env
+  // .env — the wizard's self-contained fallback. Secrets the environment already supplies (root
+  // .env / shell) are written as comments, not values, so there is exactly one source per secret.
   const envBody = [
     `YT_BRIEFING_LLM_BASE_URL=${llmBaseUrl}`,
-    `YT_BRIEFING_LLM_API_KEY=${llmKey}`,
+    envLine('YT_BRIEFING_LLM_API_KEY', llmKey, presetLlmKey),
     `YT_BRIEFING_LLM_MODEL=${llmModel}`,
-    `YT_BRIEFING_YOUTUBE_API_KEY=${ytKey}`,
-    `YT_BRIEFING_PROXY=${ytProxy}`,
+    envLine('YT_BRIEFING_YOUTUBE_API_KEY', ytKey, presetYtKey),
+    envLine('YT_BRIEFING_PROXY', ytProxy, presetProxy),
     '',
   ].join('\n');
   writeFileSync(ENV_PATH, envBody, 'utf8');

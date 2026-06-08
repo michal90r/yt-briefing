@@ -13,12 +13,12 @@
  */
 
 import { readFileSync } from 'fs';
-import dotenv from 'dotenv';
+import { loadEnv } from './lib/env.ts';
 import { parseState } from './lib/yt-lib.ts';
-import { STATE_MD, ENV_PATH } from './lib/paths.ts';
+import { STATE_MD } from './lib/paths.ts';
 import { fetchChannelVideos, type Video } from './lib/yt-api.ts';
 
-dotenv.config({ path: ENV_PATH });
+loadEnv();
 
 interface PendingVideo {
   videoId: string;

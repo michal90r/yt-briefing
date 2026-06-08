@@ -18,11 +18,10 @@
  * Quota: ~1 unit per page (playlistItems.list) + 1 unit per 50 videos (videos.list).
  */
 
-import dotenv from 'dotenv';
-import { ENV_PATH } from './lib/paths.ts';
+import { loadEnv } from './lib/env.ts';
 import { fetchChannelVideos } from './lib/yt-api.ts';
 
-dotenv.config({ path: ENV_PATH });
+loadEnv();
 
 const args = process.argv.slice(2);
 const handleOrId = args[0];

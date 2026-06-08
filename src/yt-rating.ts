@@ -18,11 +18,11 @@
  */
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import dotenv from 'dotenv';
+import { loadEnv } from './lib/env.ts';
 import { parseChannels, appendSkipTitle, appendNote, bumpStatePointer, type ChannelEntry } from './lib/yt-lib.ts';
-import { CHANNELS_MD, STATE_MD, PENDING_FILE, ENV_PATH, profilePath } from './lib/paths.ts';
+import { CHANNELS_MD, STATE_MD, PENDING_FILE, profilePath } from './lib/paths.ts';
 
-dotenv.config({ path: ENV_PATH });
+loadEnv();
 
 interface Args {
   channel: string;

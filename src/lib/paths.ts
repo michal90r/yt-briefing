@@ -37,6 +37,14 @@ process.env.YT_BRIEFING_BASE_DIR = BASE_DIR;                    // pin for child
 
 export const ENV_PATH = join(BASE_DIR, '.env');
 
+/**
+ * The project's root `.env` — the conventional, user-owned home for secrets (12-factor). When
+ * consumed, BASE_DIR is `<project>/.yt-briefing`, so the root is its parent; in a dev clone
+ * BASE_DIR === PKG_ROOT, so the root `.env` *is* ENV_PATH (one file, loaded once). Read-only:
+ * the loader never writes here, so it can't clobber the user's other variables. See lib/env.ts.
+ */
+export const ROOT_ENV_PATH = CONSUMED ? join(dirname(BASE_DIR), '.env') : ENV_PATH;
+
 export const DATA_DIR = process.env.YT_BRIEFING_DATA_DIR
   ? resolve(process.env.YT_BRIEFING_DATA_DIR)
   : join(BASE_DIR, 'data');

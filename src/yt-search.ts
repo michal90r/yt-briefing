@@ -35,17 +35,17 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import dotenv from 'dotenv';
+import { loadEnv } from './lib/env.ts';
 import { chat, getModel } from './lib/llm.ts';
 import { outputLang } from './lib/config.ts';
 import { fetchChannelVideos, type Video } from './lib/yt-api.ts';
 import { normalizeHandle } from './lib/channels.ts';
 import {
-  PKG_ROOT, ENV_PATH, CACHE_DIR,
+  PKG_ROOT, CACHE_DIR,
   SEARCH_QUEUE_FILE, SEARCH_PENDING_FILE, SEARCH_KEPT_FILE, script,
 } from './lib/paths.ts';
 
-dotenv.config({ path: ENV_PATH });
+loadEnv();
 mkdirSync(CACHE_DIR, { recursive: true });
 
 const RUNTIME = process.execPath;
@@ -249,7 +249,7 @@ async function main(): Promise<void> {
 
   // Fresh search: needs an intent AND a channel.
   if (!process.env.YT_BRIEFING_YOUTUBE_API_KEY) {
-    emit({ status: 'error', error: 'YT_BRIEFING_YOUTUBE_API_KEY is not set — add a YouTube Data API v3 key to .yt-briefing/.env (see README → setup / .env.example).' });
+    emit({ status: 'error', error: 'YT_BRIEFING_YOUTUBE_API_KEY is not set — add a YouTube Data API v3 key to your project root .env (or export it / run `bun run init`). See README → Providers → Where the keys live.' });
   }
   if (!intentArg) emit({ status: 'error', error: 'Provide an intent: yt-search "<what to look for>" --channel <@handle|url>.' });
   if (!CHANNEL) emit({ status: 'error', error: 'Provide a channel: --channel <@handle|url>. /yt-search searches within one channel, not all of YouTube.' });

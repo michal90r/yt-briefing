@@ -80,7 +80,7 @@ npx yt-briefing transcribe <url-or-id> --lang auto   # prints the transcript to 
 ## Search within a channel
 
 Mine one channel's videos for a topic and get a comparison. Run `/yt-search` with a channel and
-an intent — e.g. `/yt-search @t3dotgg which terminal for AI coding`:
+an intent — e.g. `/yt-search @betterstack which terminal for AI coding`:
 
 ```bash
 yt-briefing search "<intent>" --channel <@handle|url> [--scan N] [--since YYYY-MM-DD] [--max N]
@@ -113,6 +113,19 @@ YT_BRIEFING_LLM_MODEL=gemini-2.5-flash
 
 Want something else? Change those three lines for OpenRouter (`https://openrouter.ai/api/v1`),
 OpenAI (`https://api.openai.com/v1`), or a local Ollama (`http://localhost:11434/v1`).
+
+### Where the keys live
+
+The contract is the environment — every `YT_BRIEFING_*` variable is read from `process.env`,
+so put them wherever you keep secrets:
+
+- **Your project's root `.env`** (recommended) — the conventional, single home for a project's
+  secrets. yt-briefing only ever *reads* it, so it can't clobber your other variables.
+- **Exported in the shell / CI** — anything already in the environment wins.
+- **`bun run init`** — the wizard writes a self-contained `.yt-briefing/.env` (gitignored) for you.
+
+Precedence: **exported env → root `.env` → `.yt-briefing/.env`**. Set a variable in more than one
+place and the higher-precedence one wins, so a key in your root `.env` overrides the wizard's copy.
 
 ## Why an API, not the agent's native model
 

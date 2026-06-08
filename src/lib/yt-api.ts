@@ -5,7 +5,7 @@
  * cost ~7s to load from a cold FS cache on every fresh process. The Data API is a
  * trivial REST surface, so direct fetch keeps cold-start near the runtime's own startup.
  *
- * Auth: YT_BRIEFING_YOUTUBE_API_KEY — the entrypoint loads it (dotenv.config from ENV_PATH) before
+ * Auth: YT_BRIEFING_YOUTUBE_API_KEY — the entrypoint loads it (loadEnv() in lib/env.ts) before
  * calling; this module only reads process.env at call time.
  */
 
