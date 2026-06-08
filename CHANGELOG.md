@@ -5,6 +5,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-06-08
+
+### Fixed
+- **Installed skill is now machine-portable.** The consumed (`dist`) skill rewrite baked the
+  install machine's absolute paths — `process.execPath`, the absolute `dist/` script path and the
+  absolute `DATA_DIR` — into each `SKILL.md`. A skill committed to git on one machine then broke
+  when run on another (e.g. authored on macOS, run on a Linux VPS: *"config.json does not exist"*).
+  The rewrite now emits a bare runtime name (`node`/`bun`, resolved from `PATH`) and paths relative
+  to the project root, resting on the same `cwd = project` invariant `paths.ts` already uses. A
+  reinstall on any machine yields the same portable skill. Added `tests/skill-install.test.ts` to
+  lock the class out (no absolute path in an engine command or state-file read, no baked execPath).
+
 ## [0.9.2] - 2026-06-08
 
 ### Changed
@@ -149,6 +161,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[0.10.0]: https://github.com/michal90r/yt-briefing/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/michal90r/yt-briefing/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/michal90r/yt-briefing/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/michal90r/yt-briefing/compare/v0.8.0...v0.9.0
