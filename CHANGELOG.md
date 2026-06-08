@@ -5,6 +5,12 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-06-08
+
+### Changed
+- README: scaled back the 0.9.0 reword. Only the lead avoids "summary" now (it reads "a short
+  briefing"); the `/yt-transcribe` and "Why an API" sections keep "summary" as before. Docs only.
+
 ## [0.9.0] - 2026-06-08
 
 ### Changed
@@ -135,6 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[0.9.1]: https://github.com/michal90r/yt-briefing/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/michal90r/yt-briefing/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/michal90r/yt-briefing/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/michal90r/yt-briefing/compare/v0.6.0...v0.7.0
