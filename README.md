@@ -86,8 +86,8 @@ It covers the channel's **whole history** (not just recent uploads), re-ranks ev
 your intent, then lazily yields one matching video at a time to keep or skip — and synthesizes a
 comparison from everything you kept.
 
-The one flag is `--max N` — how many of the top re-ranked matches to triage (**default 10**). Raise
-it to go deeper, lower it for a quicker pass: `/yt-search @betterstack which terminal --max 20`.
+The one flag is `--top N` — how many of the top re-ranked matches to triage (**default 10**). Raise
+it to go deeper, lower it for a quicker pass: `/yt-search @betterstack which terminal --top 20`.
 
 ## Run it
 

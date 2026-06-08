@@ -16,7 +16,7 @@
  * the channel's videos by intent (no exact-keyword needed).
  *
  * Usage (the skill / CLI drives these; one JSON line per call):
- *   yt-search "<intent>" --channel <@handle|url> [--reset] [--max N] [--scan N] [--since DATE] [--lang auto]
+ *   yt-search "<intent>" --channel <@handle|url> [--reset] [--top N] [--scan N] [--since DATE] [--lang auto]
  *   yt-search --keep        record the pending candidate, advance, yield next
  *   yt-search --skip        drop the pending candidate, advance, yield next
  *   yt-search --compare     synthesize a comparison from everything kept
@@ -52,7 +52,7 @@ const RUNTIME = process.execPath;
 const LANG = outputLang();
 
 const argv = process.argv.slice(2);
-const VALUE_FLAGS = new Set(['--channel', '--max', '--scan', '--since', '--lang']);
+const VALUE_FLAGS = new Set(['--channel', '--top', '--scan', '--since', '--lang']);
 const has = (f: string) => argv.includes(f);
 const flagVal = (f: string): string | null => {
   const i = argv.indexOf(f);
@@ -75,7 +75,7 @@ const KEEP = has('--keep');
 const SKIP = has('--skip');
 const COMPARE = has('--compare');
 const CHANNEL = flagVal('--channel');
-const MAX = Math.max(1, parseInt(flagVal('--max') || '10', 10));
+const TOP = Math.max(1, parseInt(flagVal('--top') || '10', 10));
 const SCAN = Math.max(1, parseInt(flagVal('--scan') || '50', 10));   // recent uploads to consider when no --since
 const SINCE = flagVal('--since');
 const LANGTRACK = flagVal('--lang') || 'auto';
@@ -265,7 +265,7 @@ async function main(): Promise<void> {
   if (videos!.length === 0) emit({ status: 'no_results' });
 
   const pool: Candidate[] = videos!.map(v => ({ videoId: v.videoId, title: v.title, channelTitle: handle, publishedAt: v.publishedAt, description: v.description }));
-  const ranked = (await rerank(intentArg, pool)).slice(0, MAX);
+  const ranked = (await rerank(intentArg, pool)).slice(0, TOP);
   if (ranked.length === 0) emit({ status: 'no_results' });
 
   const queue: SearchQueue = { built_at: new Date().toISOString(), intent: intentArg, channel: handle, candidates: ranked, cursor: 0 };

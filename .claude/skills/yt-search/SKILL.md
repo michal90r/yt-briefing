@@ -1,7 +1,7 @@
 ---
 name: yt-search
 description: Search WITHIN one YouTube channel by intent — name a channel and what you're after; the engine lists that channel's uploads, ranks them against your intent (metadata only, no transcript yet), then lazily yields ONE matching video at a time with a rich summary. You keep or skip each; at the end it synthesizes a comparison from everything you kept. Channel-scoped, not whole-YouTube. Same transcript engine + proxy as /yt; lazy on purpose (no transcript bursts → no IP block). Summaries and prompts use the language chosen at onboarding.
-argument-hint: A channel (@handle or URL) and a descriptive intent, e.g. "@t3dotgg which terminal for AI coding". Optional --max N, --scan N, --since YYYY-MM-DD.
+argument-hint: A channel (@handle or URL) and a descriptive intent, e.g. "@t3dotgg which terminal for AI coding". Optional --top N (default 10), --scan N, --since YYYY-MM-DD.
 ---
 
 ## How it works
