@@ -14,10 +14,10 @@
  * Everything it writes is plain Markdown / JSON you can also edit by hand afterwards.
  */
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  DATA_DIR, BASE_DIR, PKG_ROOT, CHANNELS_DIR, CHANNELS_MD, STATE_MD, CONFIG_JSON, ENV_PATH, profilePath,
+  DATA_DIR, BASE_DIR, PKG_ROOT, CHANNELS_DIR, CHANNELS_MD, STATE_MD, CONFIG_JSON, ROOT_ENV_PATH, profilePath,
 } from './lib/paths.ts';
 import { AGENTS, installSkills, projectSkillsRoot, customSkillsRootDefault, isPackageDevCwd } from './lib/skill-install.ts';
 import { loadEnv } from './lib/env.ts';
@@ -39,12 +39,21 @@ const askSecret = (q: string, preset: string): string => {
   if (preset) return question(`${q} [Enter = keep the value from your environment]:`).trim() || preset;
   return ask(q);
 };
-// A secret the env already supplies is NOT re-written into the fallback .yt-briefing/.env — that
-// would leave a second, shadowed copy that drifts. We emit a comment instead, keeping one source.
-const envLine = (key: string, value: string, preset: string): string =>
-  value && value === preset
-    ? `# ${key} — provided by your environment (root .env / shell)`
-    : `${key}=${value}`;
+// Merge vars into the project root .env without clobbering: only append keys not already present
+// (so a value the user keeps from their existing root .env stays the single source). Skips empties.
+function mergeRootEnv(vars: Array<[string, string]>): string[] {
+  const existing = existsSync(ROOT_ENV_PATH) ? readFileSync(ROOT_ENV_PATH, 'utf8') : '';
+  const present = new Set(
+    existing.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'))
+      .map(l => l.slice(0, l.indexOf('=')).trim()).filter(Boolean),
+  );
+  const additions = vars.filter(([k, v]) => v !== '' && !present.has(k)).map(([k, v]) => `${k}=${v}`);
+  if (additions.length) {
+    const sep = existing && !existing.endsWith('\n') ? '\n' : '';
+    writeFileSync(ROOT_ENV_PATH, existing + sep + additions.join('\n') + '\n', 'utf8');
+  }
+  return additions.map(l => l.slice(0, l.indexOf('=')));
+}
 
 interface ChannelInput { handle: string; slug: string; }
 
@@ -156,23 +165,21 @@ function main(): void {
   // 7. Write everything --------------------------------------------------------
   mkdirSync(CHANNELS_DIR, { recursive: true });
 
-  // .env — the wizard's self-contained fallback. Secrets the environment already supplies (root
-  // .env / shell) are written as comments, not values, so there is exactly one source per secret.
-  const envBody = [
-    `YT_BRIEFING_LLM_BASE_URL=${llmBaseUrl}`,
-    envLine('YT_BRIEFING_LLM_API_KEY', llmKey, presetLlmKey),
-    `YT_BRIEFING_LLM_MODEL=${llmModel}`,
-    envLine('YT_BRIEFING_YOUTUBE_API_KEY', ytKey, presetYtKey),
-    envLine('YT_BRIEFING_PROXY', ytProxy, presetProxy),
-    '',
-  ].join('\n');
-  writeFileSync(ENV_PATH, envBody, 'utf8');
+  // Secrets live in the project ROOT .env (the only file the engine reads). Merge into it without
+  // clobbering — keys already there (e.g. kept from the environment) stay the single source. The
+  // engine has no fallback file, so a key not set here (or exported) is a hard error at run time.
+  const envAdded = mergeRootEnv([
+    ['YT_BRIEFING_LLM_BASE_URL', llmBaseUrl],
+    ['YT_BRIEFING_LLM_API_KEY', llmKey],
+    ['YT_BRIEFING_LLM_MODEL', llmModel],
+    ['YT_BRIEFING_YOUTUBE_API_KEY', ytKey],
+    ['YT_BRIEFING_PROXY', ytProxy],
+  ]);
 
-  // Secret-safety for the consume layout: drop a .gitignore inside .yt-briefing/ so .env never
-  // gets committed regardless of the host project's own ignore rules. data/ stays versionable
-  // (for sync). In a dev clone (BASE_DIR === PKG_ROOT) the repo's own .gitignore already covers it.
+  // Keep the throwaway cache out of git for the consume layout. data/ stays versionable (for sync).
+  // No secrets live under .yt-briefing/ anymore, so nothing else needs ignoring here.
   if (BASE_DIR !== PKG_ROOT) {
-    writeFileSync(join(BASE_DIR, '.gitignore'), '.env\ndata/.cache/\n', 'utf8');
+    writeFileSync(join(BASE_DIR, '.gitignore'), 'data/.cache/\n', 'utf8');
   }
 
   // config.json
@@ -186,7 +193,7 @@ function main(): void {
 
   console.log('  ' + '─'.repeat(40));
   console.log(`  Done. Wrote:`);
-  console.log(`    ${ENV_PATH}`);
+  console.log(`    ${ROOT_ENV_PATH}  ${envAdded.length ? `(+${envAdded.join(', ')})` : '(no new keys — already set)'}`);
   console.log(`    ${CONFIG_JSON}`);
   console.log(`    ${CHANNELS_MD}`);
   console.log(`    ${STATE_MD}`);

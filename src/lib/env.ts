@@ -1,25 +1,42 @@
 /**
- * Single env loader — the one place that reads secrets off disk.
+ * Env loader + required-variable preflight — the one place that reads secrets off disk.
  *
- * The contract is `process.env`; dotenv only fills what's missing. dotenv never overrides an
- * already-set variable, and the first file to define one wins, so precedence is:
+ * Keys come from the project's root `.env` ONLY. There is no fallback file: dotenv loads root
+ * `.env` into process.env (anything already exported wins, since dotenv never overrides). Missing
+ * a required variable is a hard error that names exactly which one — never a silent default.
  *
- *   exported env (CI / shell / direnv)  >  project root `.env`  >  legacy `.yt-briefing/.env`
- *
- * Root `.env` is the conventional, user-owned home for secrets (12-factor) — the tool only
- * *reads* it, never writes, so it can't clobber a user's other variables. `.yt-briefing/.env`
- * (written by the `init` wizard) stays a fallback so existing installs keep working.
- *
- * Call `loadEnv()` once at every entrypoint before reading any YT_BRIEFING_* variable.
+ * Call `loadEnv()` once at every entrypoint, then `requireEnv([...])` for what that command needs.
  */
 import dotenv from 'dotenv';
-import { ROOT_ENV_PATH, ENV_PATH } from './paths.ts';
+import { ROOT_ENV_PATH } from './paths.ts';
 
 let done = false;
 
+/** Load the project's root `.env` into process.env. The only file we read. */
 export function loadEnv(): void {
   if (done) return;
   done = true;
-  dotenv.config({ path: ROOT_ENV_PATH });                            // primary: user-owned project root .env
-  if (ENV_PATH !== ROOT_ENV_PATH) dotenv.config({ path: ENV_PATH }); // fallback: wizard's .yt-briefing/.env
+  dotenv.config({ path: ROOT_ENV_PATH });
+}
+
+/** The required vars per capability — single source of truth for the preflight checks. */
+export const REQUIRED_LLM = ['YT_BRIEFING_LLM_BASE_URL', 'YT_BRIEFING_LLM_API_KEY', 'YT_BRIEFING_LLM_MODEL'];
+export const REQUIRED_YOUTUBE = ['YT_BRIEFING_YOUTUBE_API_KEY'];
+
+/** Names from `names` that are missing or empty in the environment, in order. */
+export function missingEnv(names: string[]): string[] {
+  return names.filter(n => !process.env[n]);
+}
+
+/** Human-readable error for a set of missing vars — names each one and where to set it. */
+export function missingEnvMessage(missing: string[]): string {
+  const plural = missing.length > 1;
+  return `Missing required environment variable${plural ? 's' : ''}: ${missing.join(', ')}. ` +
+    `Set ${plural ? 'them' : 'it'} in your project root .env (see README → Providers → Where the keys live).`;
+}
+
+/** Throw a clear, named error if any required var is missing. */
+export function requireEnv(names: string[]): void {
+  const missing = missingEnv(names);
+  if (missing.length) throw new Error(missingEnvMessage(missing));
 }

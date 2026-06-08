@@ -5,6 +5,34 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-06-08
+
+### Changed (BREAKING)
+- `/yt-search`'s `--max` flag is renamed **`--top`** (how many of the top re-ranked matches to
+  triage, default 10).
+- **Env var location moved: `.yt-briefing/.env` → project root `.env`.** Secrets are now read from
+  your project's root `.env`. The old per-tool `.yt-briefing/.env` is no longer read — move any keys
+  you kept there to the root `.env`.
+- **No fallback file — root `.env` is the single source.** A single loader (`lib/env.ts`) reads the
+  root `.env` and nothing else; anything already exported in the environment still wins. There is no
+  secondary location to fall back to.
+- **All provider variables are required — no silent defaults.** `YT_BRIEFING_LLM_BASE_URL`,
+  `YT_BRIEFING_LLM_API_KEY`, `YT_BRIEFING_LLM_MODEL`, and `YT_BRIEFING_YOUTUBE_API_KEY` must be set.
+  The former OpenRouter/Gemini defaults for base URL and model were removed — they silently masked a
+  half-configured provider (e.g. a Gemini key fired at the default OpenRouter URL → confusing 401).
+  `YT_BRIEFING_PROXY` and `YT_BRIEFING_DLP_PATH` stay optional.
+
+### Added
+- **Fail-fast preflight that names the missing variable(s).** A missing key used to fail silently —
+  the YouTube error collapsed to a misleading "no new videos", and a missing LLM key was swallowed
+  by the title-filter's keep-all fallback. Now `yt-sweep` / `yt-search` check up front and emit
+  `status:"error"` listing exactly which variables are missing. Scope is per command: `--compare` /
+  `--keep` / `--skip` need only the LLM vars (they run off cache), not the YouTube key.
+
+### Migration
+- Put `YT_BRIEFING_*` in your project root `.env` — `yt-briefing init` now writes/merges them there
+  without clobbering your other variables — or export them. `.yt-briefing/.env` is no longer read.
+
 ## [0.6.0] - 2026-06-07
 
 ### Changed
@@ -93,6 +121,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[0.7.0]: https://github.com/michal90r/yt-briefing/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/michal90r/yt-briefing/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/michal90r/yt-briefing/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/michal90r/yt-briefing/compare/v0.3.2...v0.4.0

@@ -114,16 +114,20 @@ OpenAI (`https://api.openai.com/v1`), or a local Ollama (`http://localhost:11434
 
 ### Where the keys live
 
-The contract is the environment — every `YT_BRIEFING_*` variable is read from `process.env`,
-so put them wherever you keep secrets:
+Keys are read from your project's **root `.env`** only — there is no fallback file. Put them there
+(or export them in the shell / CI — an exported var wins). `bun run init` writes them into your
+root `.env`, merging without clobbering any other variables already in it.
 
-- **Your project's root `.env`** (recommended) — the conventional, single home for a project's
-  secrets. yt-briefing only ever *reads* it, so it can't clobber your other variables.
-- **Exported in the shell / CI** — anything already in the environment wins.
-- **`bun run init`** — the wizard writes a self-contained `.yt-briefing/.env` (gitignored) for you.
+These are **required**, and missing one fails fast naming exactly which (no silent defaults):
 
-Precedence: **exported env → root `.env` → `.yt-briefing/.env`**. Set a variable in more than one
-place and the higher-precedence one wins, so a key in your root `.env` overrides the wizard's copy.
+```ini
+YT_BRIEFING_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+YT_BRIEFING_LLM_API_KEY=<your-key>
+YT_BRIEFING_LLM_MODEL=gemini-2.5-flash
+YT_BRIEFING_YOUTUBE_API_KEY=<your-key>
+```
+
+`YT_BRIEFING_PROXY` and `YT_BRIEFING_DLP_PATH` are optional. Keep `.env` gitignored.
 
 ## Why an API, not the agent's native model
 

@@ -10,17 +10,18 @@
  * the default — cheap and fast enough for the batch title filter, capable enough for
  * the summaries.
  *
- * Env (see .env.example):
- *   YT_BRIEFING_LLM_BASE_URL   default https://openrouter.ai/api/v1
+ * Env (see .env.example) — all required, no defaults:
+ *   YT_BRIEFING_LLM_BASE_URL   required (e.g. https://openrouter.ai/api/v1)
  *   YT_BRIEFING_LLM_API_KEY    required
- *   YT_BRIEFING_LLM_MODEL      default google/gemini-2.5-flash
+ *   YT_BRIEFING_LLM_MODEL      required (e.g. google/gemini-2.5-flash)
  */
 
-const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "google/gemini-2.5-flash";
+import { requireEnv, REQUIRED_LLM } from "./env.ts";
 
 export function getModel(): string {
-  return process.env.YT_BRIEFING_LLM_MODEL || DEFAULT_MODEL;
+  const model = process.env.YT_BRIEFING_LLM_MODEL;
+  if (!model) throw new Error("Missing required environment variable: YT_BRIEFING_LLM_MODEL. Set it in your project root .env.");
+  return model;
 }
 
 export interface ChatOptions {
@@ -30,9 +31,9 @@ export interface ChatOptions {
 }
 
 export async function chat(prompt: string, opts: ChatOptions = {}): Promise<string> {
-  const baseUrl = (process.env.YT_BRIEFING_LLM_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");
-  const apiKey = process.env.YT_BRIEFING_LLM_API_KEY;
-  if (!apiKey) throw new Error("YT_BRIEFING_LLM_API_KEY not set (see .env.example)");
+  requireEnv(REQUIRED_LLM);
+  const baseUrl = process.env.YT_BRIEFING_LLM_BASE_URL!.replace(/\/+$/, "");
+  const apiKey = process.env.YT_BRIEFING_LLM_API_KEY!;
   const model = opts.model || getModel();
 
   const messages: Array<{ role: "system" | "user"; content: string }> = [];

@@ -35,7 +35,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { loadEnv } from './lib/env.ts';
+import { loadEnv, missingEnv, missingEnvMessage, REQUIRED_LLM, REQUIRED_YOUTUBE } from './lib/env.ts';
 import { chat, getModel } from './lib/llm.ts';
 import { outputLang } from './lib/config.ts';
 import { fetchChannelVideos, type Video } from './lib/yt-api.ts';
@@ -219,6 +219,14 @@ async function yieldNext(queue: SearchQueue): Promise<never> {
 }
 
 async function main(): Promise<void> {
+  // LLM is needed on every path (rerank, summaries, compare). Fail fast naming any missing var
+  // (the throw is turned into a status:"error" by the .catch below). YouTube is checked separately,
+  // only when building a fresh queue (the compare/keep/skip paths work off cache, no API).
+  {
+    const missing = missingEnv(REQUIRED_LLM);
+    if (missing.length) emit({ status: 'error', error: missingEnvMessage(missing) });
+  }
+
   // --compare: synthesize from kept summaries.
   if (COMPARE) {
     const queue = loadQueue();
@@ -247,9 +255,10 @@ async function main(): Promise<void> {
     await yieldNext(existing);
   }
 
-  // Fresh search: needs an intent AND a channel.
-  if (!process.env.YT_BRIEFING_YOUTUBE_API_KEY) {
-    emit({ status: 'error', error: 'YT_BRIEFING_YOUTUBE_API_KEY is not set — add a YouTube Data API v3 key to your project root .env (or export it / run `bun run init`). See README → Providers → Where the keys live.' });
+  // Fresh search: needs an intent AND a channel AND the YouTube key (to list the channel).
+  {
+    const missing = missingEnv(REQUIRED_YOUTUBE);
+    if (missing.length) emit({ status: 'error', error: missingEnvMessage(missing) });
   }
   if (!intentArg) emit({ status: 'error', error: 'Provide an intent: yt-search "<what to look for>" --channel <@handle|url>.' });
   if (!CHANNEL) emit({ status: 'error', error: 'Provide a channel: --channel <@handle|url>. /yt-search searches within one channel, not all of YouTube.' });

@@ -50,7 +50,7 @@
 
 import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, renameSync, appendFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { loadEnv } from './lib/env.ts';
+import { loadEnv, missingEnv, missingEnvMessage, REQUIRED_LLM, REQUIRED_YOUTUBE } from './lib/env.ts';
 import { parseChannels, parseState, bumpStatePointer } from './lib/yt-lib.ts';
 import { chat, getModel } from './lib/llm.ts';
 import { outputLang } from './lib/config.ts';
@@ -572,12 +572,13 @@ if (reset) {
   clearRest();
   clearPrefetch();
 }
-// Fatal config check, foreground only (the detached --fill / --prefetch children already
-// exited above). A missing YouTube Data API key makes EVERY channel expansion throw the same
-// error, which the per-channel `catch` collapses to 0 items — surfacing as a misleading
-// `status:"done"` ("no new videos"). Fail fast with a clear, actionable error instead.
-if (!process.env.YT_BRIEFING_YOUTUBE_API_KEY) {
-  emit({ status: 'error', error: 'YT_BRIEFING_YOUTUBE_API_KEY is not set — add a YouTube Data API v3 key to .yt-briefing/.env (see README → first run / .env.example).' });
+// Fatal config preflight, foreground only (the detached --fill / --prefetch children already
+// exited above). A missing key would otherwise surface as a misleading `status:"done"` ("no new
+// videos") — the YouTube error is collapsed by the per-channel catch, and a missing LLM key is
+// swallowed by the title-filter's keep-all fallback. Fail fast naming every missing var instead.
+{
+  const missing = missingEnv([...REQUIRED_LLM, ...REQUIRED_YOUTUBE]);
+  if (missing.length) emit({ status: 'error', error: missingEnvMessage(missing) });
 }
 const queue = loadQueue() ?? buildQueue();
 await advance(queue);

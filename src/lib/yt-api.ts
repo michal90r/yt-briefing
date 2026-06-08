@@ -33,7 +33,7 @@ const API = 'https://www.googleapis.com/youtube/v3';
 
 function apiKey(): string {
   const k = process.env.YT_BRIEFING_YOUTUBE_API_KEY;
-  if (!k) throw new Error('YT_BRIEFING_YOUTUBE_API_KEY env var not set (see .env.example)');
+  if (!k) throw new Error('Missing required environment variable: YT_BRIEFING_YOUTUBE_API_KEY. Set it in your project root .env (see README → Providers → Where the keys live).');
   return k;
 }
 
