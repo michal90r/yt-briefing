@@ -77,12 +77,12 @@ npx yt-briefing list                                        # show the current l
 
 ## One-off: transcribe a single video
 
-Just want one video summarized — no channels, no queue, no rating? Run `/yt-transcribe` and
+Just want one video distilled — no channels, no queue, no rating? Run `/yt-transcribe` and
 paste a URL or video ID. It pulls that video's transcript and writes a journalist-grade
-summary in the language you chose at setup (the same `output_lang` as `/yt`). Want a one-off in
+briefing in the language you chose at setup (the same `output_lang` as `/yt`). Want a one-off in
 another language? Just say so when you run it (e.g. `/yt-transcribe <url> in German`) — it
 won't change your setup. `--lang pl|en` is separate — it picks which caption track to fetch,
-not the summary language.
+not the language it's written in.
 
 The skill is installed alongside `/yt` by `init` / `install-skill`. From the plain CLI:
 
@@ -128,11 +128,11 @@ OpenAI (`https://api.openai.com/v1`), or a local Ollama (`http://localhost:11434
 
 ## Why an API, not the agent's native model
 
-The filtering and the summaries go through a plain OpenAI-compatible API call from the engine,
+The filtering and the briefings go through a plain OpenAI-compatible API call from the engine,
 not through the coding agent's own model. Two reasons.
 
 Speed. The engine works ahead in the background. It expands channels in parallel and starts
-summarizing the next video while you rate the current one, so the following step is usually
+on the next video's briefing while you rate the current one, so the following step is usually
 ready with no wait. An agent's turn-by-turn loop cannot prefetch like that, and every step pays
 its own cold start, which adds up across a whole queue.
 
