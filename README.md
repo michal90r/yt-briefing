@@ -55,9 +55,9 @@ YT_BRIEFING_LLM_MODEL=gemini-2.5-flash
 YT_BRIEFING_YOUTUBE_API_KEY=<key>    # console.cloud.google.com → enable "YouTube Data API v3"
 ```
 
-Any OpenAI-compatible endpoint works — see [Providers](#providers) to use OpenRouter, OpenAI, or a
-local Ollama instead of Gemini. Miss a key and the engine tells you exactly which one. Keep `.env`
-gitignored; `YT_BRIEFING_PROXY` (datacenter/VPS IPs) is the only optional extra.
+Any OpenAI-compatible endpoint works — see [Providers](#providers) to use OpenRouter, OpenAI,
+Anthropic, or a local Ollama instead of Gemini. `YT_BRIEFING_PROXY` (datacenter/VPS IPs) is the
+only optional extra.
 
 4. Onboard:
 
@@ -84,23 +84,32 @@ another language? Just say so when you run it (e.g. `/yt-transcribe <url> in Ger
 won't change your setup. `--lang pl|en` is separate — it picks which caption track to fetch,
 not the summary language.
 
-The skill is installed alongside `/yt` by `init` / `install-skill`. From the plain CLI:
+For example:
 
-```bash
-npx yt-briefing transcribe <url-or-id> --lang auto   # prints the transcript to stdout
+```
+/yt-transcribe https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ```
 
 ## Search within a channel
 
 Mine one channel's videos for a topic and get a comparison. Run `/yt-search` with a channel and
-an intent — e.g. `/yt-search @betterstack which terminal for AI coding`.
+an intent — for example:
+
+```
+/yt-search @betterstack which terminal for AI coding
+```
 
 It covers the channel's **whole history** (not just recent uploads), re-ranks every upload against
 your intent, then lazily yields one matching video at a time to keep or skip — and synthesizes a
 comparison from everything you kept.
 
 The one flag is `--top N` — how many of the top re-ranked matches to triage (**default 10**). Raise
-it to go deeper, lower it for a quicker pass: `/yt-search @betterstack which terminal --top 20`.
+it to go deeper, lower it for a quicker pass:
+
+```
+/yt-search @betterstack which terminal
+/yt-search @betterstack which terminal --top 5
+```
 
 ## Run it
 
@@ -123,7 +132,8 @@ YT_BRIEFING_LLM_MODEL=gemini-2.5-flash
 > or switch to a paid key (enable billing, same model) to avoid it.
 
 Want something else? Change those three lines for OpenRouter (`https://openrouter.ai/api/v1`),
-OpenAI (`https://api.openai.com/v1`), or a local Ollama (`http://localhost:11434/v1`). Set
+OpenAI (`https://api.openai.com/v1`), Anthropic (`https://api.anthropic.com/v1/`,
+e.g. `claude-sonnet-4-6`), or a local Ollama (`http://localhost:11434/v1`). Set
 `YT_BRIEFING_LLM_BASE_URL`, `_API_KEY`, and `_MODEL` in your root `.env` (see [Setup](#setup)).
 
 ## Why an API, not the agent's native model
