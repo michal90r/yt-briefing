@@ -1,5 +1,12 @@
 # yt-briefing
 
+[![npm](https://img.shields.io/npm/v/yt-briefing)](https://www.npmjs.com/package/yt-briefing)
+[![license](https://img.shields.io/npm/l/yt-briefing)](./LICENSE)
+[![node](https://img.shields.io/node/v/yt-briefing)](https://www.npmjs.com/package/yt-briefing)
+[![mac](https://github.com/michal90r/yt-briefing/actions/workflows/ci-mac.yml/badge.svg)](https://github.com/michal90r/yt-briefing/actions/workflows/ci-mac.yml)
+[![ubuntu](https://github.com/michal90r/yt-briefing/actions/workflows/ci-ubuntu.yml/badge.svg)](https://github.com/michal90r/yt-briefing/actions/workflows/ci-ubuntu.yml)
+[![windows](https://github.com/michal90r/yt-briefing/actions/workflows/ci-windows.yml/badge.svg)](https://github.com/michal90r/yt-briefing/actions/workflows/ci-windows.yml)
+
 Save hours on YouTube. yt-briefing watches the channels you follow so you don't have to. For
 each new video it gives you a short briefing in your own language — every point that matters, with
 only the filler cut, so nothing important is lost. Reading it takes a fraction of the time the
