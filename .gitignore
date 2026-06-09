@@ -1,6 +1,5 @@
 node_modules/
 .env
-bun.lock
 
 # Compiled output (built on publish via `bun run build` / prepublishOnly).
 /dist/

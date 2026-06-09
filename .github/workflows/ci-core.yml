@@ -42,7 +42,7 @@ jobs:
       - if: matrix.runtime == 'bun'
         uses: oven-sh/setup-bun@v2
       - if: matrix.runtime == 'bun'
-        run: bun install
+        run: bun install --frozen-lockfile
       - if: matrix.runtime == 'bun'
         run: bun run typecheck
       - if: matrix.runtime == 'bun'
