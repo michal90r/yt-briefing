@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-06-11
+
+### Added
+- **Research mode in `/yt`** — a third rating option, **Research** (or type `? <question>`
+  straight into the comment box): rates the video neutral so it won't reappear, breaks the
+  rating loop, re-fetches the full transcript, and digs into the video's content with you —
+  against your own project or the web (e.g. "this new tool the channel hypes — worth swapping
+  into project xyz?"). State stays durable: a later `/yt` resumes the queue where you broke off,
+  and a post-research verdict can still be recorded (`--rating 0` if it turned out to be hype,
+  `--comment` for a durable channel rule). Skill-layer only — the engine is unchanged.
+
 ## [0.11.1] - 2026-06-08
 
 ### Fixed
@@ -189,6 +200,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[0.12.0]: https://github.com/michal90r/yt-briefing/compare/v0.11.1...v0.12.0
+[0.11.1]: https://github.com/michal90r/yt-briefing/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/michal90r/yt-briefing/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/michal90r/yt-briefing/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/michal90r/yt-briefing/compare/v0.9.1...v0.9.2

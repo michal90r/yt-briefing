@@ -118,6 +118,16 @@ it to go deeper, lower it for a quicker pass:
 /yt-search @betterstack which terminal --top 5
 ```
 
+## Don't shelve it — research it
+
+Tech channels announce something new every week, and the usual fate is "looks interesting" →
+to-do list → never. So the rating popup has a third option next to OK/Weak: **Research**. Pick
+it — or type `? your question` straight into the comment box — and the loop ends there: the
+agent pulls that video's full transcript and works your question with you. Against your own
+codebase if you ask "would this fit my project", against the web if the claims need checking —
+a quick feedback loop instead of a shelf. The video is marked as seen, and the next `/yt`
+resumes the queue right where you broke off.
+
 ## Run it
 
 Open your project in Claude Code or Cursor and run `/yt`. If it's not listed, start a fresh
