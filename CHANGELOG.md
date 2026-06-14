@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.1] - 2026-06-14
+
+### Fixed
+- **Missing-key error now points to a section that exists.** The fail-fast message (and the
+  YouTube-key check) pointed to "README → Providers → Where the keys live", which was never a
+  heading; both now point to **README → Setup**, where the keys block actually lives.
+- **`init` surfaces unset keys at the end of onboarding**, instead of letting them fail only at
+  the first `/yt`. After writing your data it checks the required keys (`YT_BRIEFING_LLM_*`,
+  `YT_BRIEFING_YOUTUBE_API_KEY`) in your project root `.env`; if any are missing it lists them with
+  the exact `.env` path and points to README → Setup. Silent when everything is already set.
+
 ## [0.12.0] - 2026-06-11
 
 ### Added

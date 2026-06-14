@@ -18,8 +18,9 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  DATA_DIR, BASE_DIR, PKG_ROOT, CHANNELS_DIR, CHANNELS_MD, STATE_MD, CONFIG_JSON, profilePath,
+  DATA_DIR, BASE_DIR, PKG_ROOT, CHANNELS_DIR, CHANNELS_MD, STATE_MD, CONFIG_JSON, profilePath, ROOT_ENV_PATH,
 } from './lib/paths.ts';
+import { loadEnv, missingEnv, REQUIRED_LLM, REQUIRED_YOUTUBE } from './lib/env.ts';
 import { AGENTS, installSkills, projectSkillsRoot, customSkillsRootDefault, isPackageDevCwd } from './lib/skill-install.ts';
 import { question } from './lib/prompt.ts';
 import { normalizeHandle, slugify, serializeChannels, serializeState, profileBody, baselineStateRow } from './lib/channels.ts';
@@ -134,6 +135,17 @@ function main(): void {
     for (const t of targets) console.log(`    skill → ${t}`);
   } catch (e) {
     console.log(`  ! Couldn't install the skills (${(e as Error).message}) — run  yt-briefing install-skill  later.`);
+  }
+
+  // Preflight the keys the engine needs at run time. init deliberately does NOT write them —
+  // they live in the project root .env (12-factor) — but warn now, naming any still missing, so
+  // the gap surfaces here instead of at the first /yt.
+  loadEnv();
+  const missingKeys = missingEnv([...REQUIRED_LLM, ...REQUIRED_YOUTUBE]);
+  if (missingKeys.length) {
+    console.log('\n  ⚠ Keys still needed before /yt will run — add them to your project root .env:');
+    for (const k of missingKeys) console.log(`      ${k}`);
+    console.log(`    Path: ${ROOT_ENV_PATH}   ·   full block in README → Setup`);
   }
 
   console.log('\n  Next:');

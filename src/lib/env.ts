@@ -32,7 +32,7 @@ export function missingEnv(names: string[]): string[] {
 export function missingEnvMessage(missing: string[]): string {
   const plural = missing.length > 1;
   return `Missing required environment variable${plural ? 's' : ''}: ${missing.join(', ')}. ` +
-    `Set ${plural ? 'them' : 'it'} in your project root .env (see README → Providers → Where the keys live).`;
+    `Set ${plural ? 'them' : 'it'} in your project root .env (see README → Setup).`;
 }
 
 /** Throw a clear, named error if any required var is missing. */
