@@ -5,6 +5,13 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.2] - 2026-06-15
+
+### Fixed
+- **`transcribe` now accepts path-based YouTube URLs** — `youtube.com/shorts/ID` (and
+  `/embed/`, `/live/`, `/v/`) parsed correctly. Previously only `watch?v=`, `youtu.be/`, and
+  bare IDs were recognized, so Shorts links failed with "Invalid VIDEO_ID or YouTube URL".
+
 ## [0.12.1] - 2026-06-14
 
 ### Fixed
@@ -211,6 +218,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[0.12.2]: https://github.com/michal90r/yt-briefing/compare/v0.12.1...v0.12.2
+[0.12.1]: https://github.com/michal90r/yt-briefing/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/michal90r/yt-briefing/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/michal90r/yt-briefing/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/michal90r/yt-briefing/compare/v0.10.0...v0.11.0

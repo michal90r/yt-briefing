@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Usage: bun src/yt-transcript.ts VIDEO_ID_OR_URL [--lang pl|en|auto]
- * Accepts: bare 11-char video ID, youtube.com/watch?v=..., or youtu.be/... URL.
+ * Accepts: bare 11-char video ID, youtube.com/watch?v=..., youtu.be/..., or
+ *   path-based URLs (youtube.com/shorts|embed|live|v/...).
  * Output: plain text transcript on stdout
  * Exit 1 if the video genuinely has no subtitles — caller should skip this video.
  * Exit 2 if YouTube rate-limited / blocked the IP (caller may retry later).
@@ -58,6 +59,9 @@ function extractVideoId(input: string): string {
   if (watch) return watch[1]!;
   const short = t.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
   if (short) return short[1]!;
+  // Path-based forms: youtube.com/shorts/ID, /embed/ID, /live/ID, /v/ID
+  const path = t.match(/youtube\.com\/(?:shorts|embed|live|v)\/([A-Za-z0-9_-]{11})/);
+  if (path) return path[1]!;
   if (/^[A-Za-z0-9_-]{11}$/.test(t)) return t;
   console.error(`Invalid VIDEO_ID or YouTube URL: ${input}`);
   process.exit(3);
