@@ -1,6 +1,6 @@
 {
   "name": "yt-briefing",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "description": "A self-learning YouTube briefing engine: it sweeps the channels you follow, filters noise in two stages (title, then transcript), summarizes the rest in your language, and adapts to your ratings — one video at a time.",
   "type": "module",
   "bin": {
