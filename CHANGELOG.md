@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.3] - 2026-06-16
+
+### Fixed
+- **Already-rated videos can no longer re-appear after a `--fill` pointer regression.**
+  When `yt-sweep --fill` ran in the background and re-bumped a stale state pointer to an older
+  video, the pointer-only check (`pointer === videoId`) could transiently clear, making the
+  sweep re-emit a video the user had already rated. The new `isResolved(pointer, id, seen)`
+  helper checks both the pointer *and* the run-queue's `seen` array (written by `yt-rating`
+  immediately after each rating). `seen` is pointer-independent, so a regression can never
+  un-resolve a video that was explicitly rated in this session.
+
 ## [0.12.2] - 2026-06-15
 
 ### Fixed
@@ -218,6 +229,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[0.12.3]: https://github.com/michal90r/yt-briefing/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/michal90r/yt-briefing/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/michal90r/yt-briefing/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/michal90r/yt-briefing/compare/v0.11.1...v0.12.0

@@ -5,6 +5,7 @@ import {
   parseChannels,
   parseState,
   bumpStatePointer,
+  isResolved,
   appendToSection,
   appendSkipTitle,
   appendNote,
@@ -116,5 +117,23 @@ describe('profile section writers', () => {
     const out = appendNote(profile, 'skip shorts');
     expect(out).toContain(NOTES_HEADING);
     expect(out).toContain('- skip shorts');
+  });
+});
+
+describe('isResolved', () => {
+  it('true when the state pointer already landed on the video', () => {
+    expect(isResolved('vid1', 'vid1', [])).toBe(true);
+  });
+
+  it('true when the video is in seen even if the pointer regressed (the --fill race)', () => {
+    // A stale --fill bump left the pointer on an OLDER video (pointer !== id), but the
+    // rating already marked this one seen → it must STILL count as resolved (no re-emit).
+    expect(isResolved('older-vid', 'vid1', ['vid1'])).toBe(true);
+    expect(isResolved(null, 'vid1', ['vid1'])).toBe(true);
+  });
+
+  it('false when neither the pointer nor seen knows the video', () => {
+    expect(isResolved('older-vid', 'vid1', ['other'])).toBe(false);
+    expect(isResolved(null, 'vid1', [])).toBe(false);
   });
 });

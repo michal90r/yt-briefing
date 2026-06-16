@@ -51,7 +51,7 @@
 import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, renameSync, appendFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { loadEnv, missingEnv, missingEnvMessage, REQUIRED_LLM, REQUIRED_YOUTUBE } from './lib/env.ts';
-import { parseChannels, parseState, bumpStatePointer } from './lib/yt-lib.ts';
+import { parseChannels, parseState, bumpStatePointer, isResolved } from './lib/yt-lib.ts';
 import { chat, getModel } from './lib/llm.ts';
 import { outputLang } from './lib/config.ts';
 import {
@@ -472,8 +472,9 @@ async function advance(queue: Queue): Promise<never> {
     if (queue.items.length === 0) break;
     const item = queue.items[0]!;
 
-    // Head already resolved last round (rated/skipped → pointer landed on it) → drop.
-    if (statePointer(item) === item.videoId) { dropHead(queue); continue; }
+    // Head already resolved last round (rated/skipped → pointer landed on it, or it's in
+    // `seen`) → drop. The `seen` arm survives a --fill pointer-regression race (isResolved).
+    if (isResolved(statePointer(item), item.videoId, queue.seen)) { dropHead(queue); continue; }
 
     // Warm prefetch from the background child? Use it and skip the live fetch + content filter.
     const cached = loadPrefetch(item.videoId);
@@ -522,7 +523,7 @@ async function runPrefetch(videoId: string): Promise<never> {
   if (!queue) process.exit(0);
   const item = queue.items.find(i => i.videoId === videoId);
   if (!item) process.exit(0);
-  if (statePointer(item) === item.videoId) process.exit(0);   // already resolved
+  if (isResolved(statePointer(item), item.videoId, queue.seen)) process.exit(0);   // already resolved
   if (loadPrefetch(item.videoId)) process.exit(0);            // already warm
   const result = await processItem(item);
   if (result.kind === 'ratable') {

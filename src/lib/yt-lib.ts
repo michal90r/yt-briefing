@@ -113,6 +113,17 @@ export function bumpStatePointer(
   return bumpStateFrontmatterDate(lines.join('\n'), date);
 }
 
+/**
+ * Is this video already resolved for the current run? True when the per-(channel,type)
+ * state pointer has landed on it, OR it is in the run's `seen` set. The `seen` arm is the
+ * race-proof guard: `bumpStatePointer` is not monotonic, so a detached `--fill` re-bumping
+ * a stale pointer can transiently regress it and make a pointer-only check re-emit an
+ * already-rated video. `seen` is authoritative and pointer-independent.
+ */
+export function isResolved(pointer: string | null, videoId: string, seen: readonly string[]): boolean {
+  return pointer === videoId || seen.includes(videoId);
+}
+
 // ---------- channel profile: durable signal writes ----------
 
 /**

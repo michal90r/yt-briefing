@@ -20,7 +20,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { loadEnv } from './lib/env.ts';
 import { parseChannels, appendSkipTitle, appendNote, bumpStatePointer, type ChannelEntry } from './lib/yt-lib.ts';
-import { CHANNELS_MD, STATE_MD, PENDING_FILE, profilePath } from './lib/paths.ts';
+import { CHANNELS_MD, STATE_MD, PENDING_FILE, QUEUE_FILE, profilePath } from './lib/paths.ts';
 
 loadEnv();
 
@@ -120,6 +120,20 @@ if (!args.noState) {
     writeFileSync(STATE_MD, stateAfter, 'utf8');
     stateBumped = true;
   }
+}
+
+// 3. Mark the rated video resolved in the run queue (`seen`) — independent of the state
+//    pointer, so a cursor-regression race in yt-sweep (a detached `--fill` re-bumping a
+//    stale pointer) can't re-emit an already-rated video. Best-effort: the queue is a
+//    same-day throwaway and no sweep process writes it while the user rates.
+if (!args.noState && existsSync(QUEUE_FILE)) {
+  try {
+    const q = JSON.parse(readFileSync(QUEUE_FILE, 'utf8'));
+    if (q?.built_at === date && Array.isArray(q.seen) && !q.seen.includes(args.id)) {
+      q.seen.push(args.id);
+      writeFileSync(QUEUE_FILE, JSON.stringify(q), 'utf8');
+    }
+  } catch { /* corrupt / foreign queue → ignore; the next sweep rebuilds it */ }
 }
 
 console.log(JSON.stringify({
