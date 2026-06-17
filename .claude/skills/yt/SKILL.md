@@ -22,10 +22,12 @@ Read `data/config.json` → `output_lang` once at the start of the loop. Phrase 
 ```
 out = JSON.parse(`bun run src/yt-sweep.ts --reset`)   // Bash — first call: --reset rebuilds the queue fresh
 while true:
+  if out.skipped: FIRST, in output_lang, tell the user one line — "Skipped {out.skipped}:" + a `; `-joined list of `{channel} «{title}» — {reason}` from out.skips (videos the title/content filter dropped on the way here, including your channel directives). Then handle out.status below.
   out.status:
     "done"          → sweep finished — tell the user, stop
     "error"         → setup/config problem (e.g. missing API key) — show `out.error` to the user verbatim, stop
-    "rate_limited"  → transcript fetch blocked (usually a blocked egress IP) — tell the user, stop; recovery in README.md → Proxy
+    "rate_limited"  → YouTube is blocking the egress IP (429 / captcha) — tell the user, stop; recovery in README.md → Proxy
+    "tooling_error" → transcript toolchain failed (proxy down / yt-dlp / network) — tell the user, stop; check proxy health, then README.md → Proxy
     "rating_needed" → steps A–E
 ```
 

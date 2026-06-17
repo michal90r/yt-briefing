@@ -5,6 +5,34 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-06-17
+
+### Fixed
+- **`tooling_error` surfaces proxy/yt-dlp failures distinctly from IP blocks.**
+  `yt-transcript` exit 3 (503, tunnel down, missing yt-dlp) is now emitted as
+  `status:"tooling_error"` instead of falling through to an opaque `no_transcript` skip.
+  `rate_limited` (exit 2) remains the YouTube/IP-block case. The `/yt` skill tells the user
+  to check proxy health and points to README → Proxy.
+
+### Added
+- **Channel directives are now executed, not just consulted.**
+  The title and content filters both honor the full channel profile — `## Notes`,
+  `## Channel policy`, and `## Skip titles`. A directive that is judgeable from the title
+  alone is enforced at the title stage (fast, no transcript cost); a directive that needs
+  the transcript is enforced at the content stage. Both stages return a reason string that
+  travels through the system.
+- **Fact-check / scrutiny directives trigger a from-memory assessment.**
+  When a `## Notes` or `## Channel policy` directive asks to verify or scrutinize claims,
+  the content filter assesses them against its own background knowledge. The assessment lands
+  in its own clearly-labelled section: what can be corroborated, what looks overstated or
+  misattributed, what falls outside the model's knowledge — always marked with confidence and
+  flagged as from-memory, not live verification.
+- **Skip registry: every filtered video is now reported to the user.**
+  `yt-sweep` accumulates all skips from both stages (title filter + content filter) in a
+  per-invocation ledger and emits them as `skipped` + `skips[]` on every response. The `/yt`
+  skill surfaces a one-line "Skipped N: …" digest before each rating, so the user can see at
+  a glance what was dropped and why — without needing to dig into logs.
+
 ## [0.12.3] - 2026-06-16
 
 ### Fixed
@@ -229,6 +257,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[0.13.0]: https://github.com/michal90r/yt-briefing/compare/v0.12.3...v0.13.0
 [0.12.3]: https://github.com/michal90r/yt-briefing/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/michal90r/yt-briefing/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/michal90r/yt-briefing/compare/v0.12.0...v0.12.1

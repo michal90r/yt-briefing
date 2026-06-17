@@ -97,7 +97,7 @@ interface QueueItem {
 }
 type ItemType = QueueItem['type'];
 interface ChannelRef { handle: string; profile_path: string; }
-interface SkipRef { channel: string; type: ItemType; videoId: string; }
+interface SkipRef { channel: string; type: ItemType; videoId: string; title: string; reason: string; }
 /**
  * Lazy queue. `channels_todo` are channels not yet expanded; `items` are expanded, kept
  * videos awaiting a rating; `seen` are videoIds already resolved this run. The foreground
@@ -109,6 +109,16 @@ interface SkipRef { channel: string; type: ItemType; videoId: string; }
 interface Queue { built_at: string; channels_todo: ChannelRef[]; items: QueueItem[]; seen: string[]; }
 /** Background-fill handoff: fully expanded remaining items + their title-skips. */
 interface RestFill { built_at: string; items: QueueItem[]; skips: SkipRef[]; }
+/** One skipped video, accumulated this invocation so the loop can surface "skipped N: …". */
+interface SkipLog { stage: 'title' | 'content'; channel: string; videoId: string; title: string; reason: string; }
+const skipLedger: SkipLog[] = [];
+const recordedSkips = new Set<string>();
+/** Record a skip once per videoId — the fg/bg expansion race can apply a title-skip twice. */
+function recordSkip(log: SkipLog): void {
+  if (recordedSkips.has(log.videoId)) return;
+  recordedSkips.add(log.videoId);
+  skipLedger.push(log);
+}
 
 // ---------- subprocess helper ----------
 
@@ -148,7 +158,10 @@ function persistSkip(item: QueueItem, status: 'content_skip' | 'no_transcript'):
  * Idempotent — re-applying the same skip is a no-op. ONLY the foreground calls this.
  */
 function applyTitleSkips(skips: SkipRef[]): void {
-  for (const s of skips) bumpState(s.channel, s.type, s.videoId);
+  for (const s of skips) {
+    bumpState(s.channel, s.type, s.videoId);
+    recordSkip({ stage: 'title', channel: s.channel, videoId: s.videoId, title: s.title, reason: s.reason || 'title filter' });
+  }
 }
 
 /** Append items, skipping any videoId already queued OR already resolved (seen). */
@@ -241,18 +254,19 @@ function spawnBackgroundFill(): void {
 
 function emit(obj: { status: string; [k: string]: unknown }): never {
   log(`EXIT status=${obj.status}`);
-  process.stdout.write(JSON.stringify(obj));
+  const ledger = skipLedger.length ? { skipped: skipLedger.length, skips: skipLedger } : {};
+  process.stdout.write(JSON.stringify({ ...obj, ...ledger }));
   process.exit(0);
 }
 
 // ---------- LLM gates ----------
 
 /** Title filter: batch-classify a channel's non-baseline titles. Falls back to keep-all on any error. */
-async function runTitleFilter(profilePathAbs: string, videos: QueueItem[]): Promise<Set<string>> {
-  const skip = new Set<string>();
+async function runTitleFilter(profilePathAbs: string, videos: QueueItem[]): Promise<Map<string, string>> {
+  const skip = new Map<string, string>();
   if (!existsSync(profilePathAbs)) return skip;
   const profile = readFileSync(profilePathAbs, 'utf8');
-  if (!/##\s*Skip titles/.test(profile)) return skip;
+  if (!/##\s*(Skip titles|Notes|Channel policy)/.test(profile)) return skip;
   const toClassify = videos.filter(v => !v.is_baseline);
   if (toClassify.length === 0) return skip;
 
@@ -261,8 +275,8 @@ async function runTitleFilter(profilePathAbs: string, videos: QueueItem[]): Prom
 Channel profile:
 ${profile}
 
-Focus on the '## Skip titles' section (titles to skip) and any '## Notes' rules.
-Keep by default — only skip a title that clearly matches the worthless pattern. If that section is missing or empty: classify all as keep.
+Skip a title when it clearly matches a skip rule from the profile — a '## Skip titles' example, or a skip/reject directive in '## Notes' or '## Channel policy' that is judgeable from the title alone (defer transcript-dependent rejections to the content stage).
+Keep by default: skip only on a clear match, and when unsure, keep.
 
 Videos:
 ${JSON.stringify(toClassify.map(v => ({ id: v.videoId, title: v.title, type: v.type })))}
@@ -282,8 +296,8 @@ Output ONLY a raw JSON array (no markdown fences, no explanation):
   try {
     const start = out.indexOf('['), end = out.lastIndexOf(']');
     if (start === -1 || end === -1) return skip;
-    const parsed: Array<{ id: string; result: string }> = JSON.parse(out.slice(start, end + 1));
-    for (const r of parsed) if (r.result === 'skip') skip.add(r.id);
+    const parsed: Array<{ id: string; result: string; reason?: string }> = JSON.parse(out.slice(start, end + 1));
+    for (const r of parsed) if (r.result === 'skip') skip.set(r.id, (r.reason ?? '').trim());
   } catch { /* keep-all */ }
   return skip;
 }
@@ -293,7 +307,7 @@ async function runContentFilter(item: QueueItem, transcript: string): Promise<st
   const profile = existsSync(item.profile_path) ? readFileSync(item.profile_path, 'utf8') : '';
   const baselineNote = item.is_baseline ? ' · baseline' : '';
   const profileSection = profile
-    ? `\nChannel profile (sections to honor: Channel policy, Summary format, Cut sections, Episode types, Notes):\n${profile}\n`
+    ? `\nChannel directives — standing instructions the user set for THIS channel (sections: Channel policy, Summary format, Cut sections, Episode types, Notes). Carry them out as written: a directive may reject the video outright (see the skip check in step 1), or — for a video that passes — add a section, shift emphasis or tone, or scrutinize/flag specific things within the briefing format (never changing its skeleton). If a directive asks you to verify or scrutinize claims, assess them against your own background knowledge: state what you can corroborate, what looks overstated, cherry-picked or misattributed, and what you cannot place. Always mark your confidence, and say plainly this is a from-memory assessment, not live verification — for anything recent or outside your knowledge, flag that instead of guessing. Keep "what the video claims" separate from your own assessment.\n${profile}\n`
     : '';
 
   const prompt = `Write a summary of this YouTube video in ${LANG}, OR return 'OFFTOPIC: <reason>' if the transcript clearly does not match what the title/channel promises.
@@ -310,18 +324,19 @@ Transcript:
 ${transcript}
 ${profileSection}
 Steps:
-1. Substance check: does the transcript actually deliver what the title promises? If clearly not → output ONLY 'OFFTOPIC: <short reason>' and stop.
+1. Substance / skip check — output ONLY 'OFFTOPIC: <short reason>' and stop if EITHER (a) the transcript clearly does not deliver what the title promises, OR (b) a channel directive clearly instructs rejecting this kind of content and the transcript clearly meets that rejection criterion. When unsure, keep. Otherwise continue.
 2. Otherwise write the summary:
    - Header: ### ${item.channel} — "${item.title}"
    - Subtitle: _${item.publishedAt} · ${item.type} · https://youtube.com/watch?v=${item.videoId}${baselineNote}_
    - 2-5 numbered thematic sections × 2-5 sentences each
    - At most 5-8 short quotes from the transcript
    - No timestamps
-3. Language: natural ${LANG}. Avoid calques/anglicisms; use foreign words only for proper nouns or established technical terms. Section headers should be verb phrases, not noun stacks.
-4. Output: ONLY the summary OR 'OFFTOPIC: ...'. No preamble, no trailing commentary.`;
+3. Apply the channel directives above, if any — they shape the briefing's content, emphasis, and tone, but not the header/subtitle/section skeleton. Put any directive-driven assessment in its own short, clearly-labeled section.
+4. Language: natural ${LANG}. Avoid calques/anglicisms; use foreign words only for proper nouns or established technical terms. Section headers should be verb phrases, not noun stacks.
+5. Output: ONLY the briefing itself OR 'OFFTOPIC: ...'. No preamble, and no meta-commentary about these instructions.`;
 
   return await chat(prompt, {
-    system: `You are a video summarizer writing in ${LANG}. Follow the task instructions exactly. Output only the summary or 'OFFTOPIC: <reason>'. No preamble, no commentary.`,
+    system: `You write channel briefings in ${LANG}, following the task instructions and the channel's standing directives exactly. Output only the briefing or 'OFFTOPIC: <reason>' — no preamble, no meta-commentary about the instructions.`,
     model: getModel(),
   });
 }
@@ -354,7 +369,7 @@ async function expandChannel(ref: ChannelRef): Promise<{ items: QueueItem[]; ski
   const items: QueueItem[] = [];
   const skips: SkipRef[] = [];
   for (const it of candidates) {
-    if (titleSkip.has(it.videoId)) skips.push({ channel: it.channel, type: it.type, videoId: it.videoId });
+    if (titleSkip.has(it.videoId)) skips.push({ channel: it.channel, type: it.type, videoId: it.videoId, title: it.title, reason: titleSkip.get(it.videoId) || 'title filter' });
     else items.push(it);
   }
   return { items, skips };
@@ -441,8 +456,9 @@ function statePointer(item: QueueItem): string | null {
 
 type ItemResult =
   | { kind: 'ratable'; summary: string }
-  | { kind: 'skip'; status: 'no_transcript' | 'content_skip' }
-  | { kind: 'rate_limited' };
+  | { kind: 'skip'; status: 'no_transcript' | 'content_skip'; reason?: string }
+  | { kind: 'rate_limited' }
+  | { kind: 'tooling_error' };
 
 /**
  * Pure-ish pipeline for one queue item: fetch transcript → substance check + summary.
@@ -454,13 +470,16 @@ async function processItem(item: QueueItem): Promise<ItemResult> {
   const t = await run([RUNTIME, script('yt-transcript'), item.videoId, '--lang', 'auto']);
   log(`transcript ${item.videoId} ${Date.now() - tT}ms (exit ${t.code})`);
   if (t.code === 2) return { kind: 'rate_limited' };
+  // exit 3 = tooling/proxy failure (503, tunnel down, missing yt-dlp) — NOT a missing-captions
+  // case. Surface it distinctly so the operator looks at the toolchain, not at YouTube/IP.
+  if (t.code === 3) return { kind: 'tooling_error' };
   if (t.code !== 0) return { kind: 'skip', status: 'no_transcript' };
-  if (!t.stdout.trim()) return { kind: 'skip', status: 'content_skip' };
+  if (!t.stdout.trim()) return { kind: 'skip', status: 'content_skip', reason: 'empty transcript' };
 
   const tC = Date.now();
   const summary = await runContentFilter(item, t.stdout);
   log(`content ${item.videoId} ${Date.now() - tC}ms`);
-  if (summary.startsWith('OFFTOPIC:')) return { kind: 'skip', status: 'content_skip' };
+  if (summary.startsWith('OFFTOPIC:')) return { kind: 'skip', status: 'content_skip', reason: summary.slice(9).trim() };
   return { kind: 'ratable', summary };
 }
 
@@ -487,8 +506,13 @@ async function advance(queue: Queue): Promise<never> {
       writeFileSync(QUEUE_FILE, JSON.stringify(queue));
       emit({ status: 'rate_limited' });
     }
+    if (result.kind === 'tooling_error') {
+      writeFileSync(QUEUE_FILE, JSON.stringify(queue));
+      emit({ status: 'tooling_error' });
+    }
     if (result.kind === 'skip') {
       persistSkip(item, result.status);
+      recordSkip({ stage: 'content', channel: item.channel, videoId: item.videoId, title: item.title, reason: result.reason ?? (result.status === 'no_transcript' ? 'no transcript' : 'off-topic') });
       dropHead(queue);
       continue;
     }
