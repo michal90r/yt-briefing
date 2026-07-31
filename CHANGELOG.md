@@ -5,6 +5,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.1] - 2026-07-31
+
+### Fixed
+- **A same-day channel with multiple sweeps could silently orphan backlog videos.**
+  `yt-channel-pending` fetched a channel's videos with `--since` set to state.md's
+  `updated` column — the date state.md was last *written*, stamped to today on every
+  pointer bump. After the first bump of the day, a later `/yt` run on the same channel
+  would only fetch videos published *today*, permanently skipping anything published
+  between the true pointer and today whenever the channel wasn't fully drained in one
+  sitting (e.g. a `--reset` between two `/yt` invocations). Fixed by fetching with a
+  fixed 45-day lookback instead — the existing pointer-cutoff logic still does the real
+  filtering, it just needs a window wide enough to always re-find the pointer video.
+
 ## [0.13.0] - 2026-06-17
 
 ### Fixed

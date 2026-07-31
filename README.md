@@ -150,7 +150,7 @@ YT_BRIEFING_LLM_MODEL=gemini-2.5-flash
 
 Want something else? Change those three lines for OpenRouter (`https://openrouter.ai/api/v1`),
 OpenAI (`https://api.openai.com/v1`), Anthropic (`https://api.anthropic.com/v1/`,
-e.g. `claude-sonnet-4-6`), or a local Ollama (`http://localhost:11434/v1`). Set
+e.g. `claude-sonnet-5`), or a local Ollama (`http://localhost:11434/v1`). Set
 `YT_BRIEFING_LLM_BASE_URL`, `_API_KEY`, and `_MODEL` in your root `.env` (see [Setup](#setup)).
 
 ## Why an API, not the agent's native model

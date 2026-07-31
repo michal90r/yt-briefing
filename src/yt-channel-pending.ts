@@ -2,8 +2,11 @@
 /**
  * Usage: bun src/yt-channel-pending.ts @HANDLE
  *
- * For one channel: reads state.md pointers + last-updated date,
- * fetches the channel's videos in-process via lib/yt-api.ts (--since updated),
+ * For one channel: reads state.md pointers, fetches the channel's videos in-process via
+ * lib/yt-api.ts (--since a fixed lookback, NOT state.md's `updated` — that column is a
+ * write-timestamp, not the pointer video's publish date; using it as the fetch cutoff
+ * silently orphaned backlog videos on channels swept more than once per day, see
+ * CHANGELOG),
  * filters to videos NEWER than each type's pointer (or baseline if pointer null),
  * sorts ASC by publishedAt (process oldest first → state pointer advances monotonically),
  * outputs JSON array: [{videoId, title, publishedAt, type, is_baseline}].
@@ -41,7 +44,14 @@ if (!row) {
   process.exit(1);
 }
 
-const since = row.updated ?? '2020-01-01';
+// `row.updated` is when state.md was last WRITTEN (stamped to today on every bump),
+// not when the pointer video was PUBLISHED — reusing it as the fetch cutoff shrinks the
+// window to "today" after the first bump of the day, so a second same-day sweep can
+// silently drop any not-yet-processed backlog between the pointer and today. A fixed
+// lookback avoids that: the pointer-cutoff logic below still does the real filtering,
+// this just has to be wide enough to always re-include the pointer video itself.
+const LOOKBACK_DAYS = 45;
+const since = new Date(Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 let videos: Video[];
 try {
   videos = await fetchChannelVideos(handle, { since });
