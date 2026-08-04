@@ -23,7 +23,7 @@
  * Mac dev box and a Linux VPS), which an absolute `process.execPath`/`<abs>/dist` baking did not.
  * (Requires `dist/` — build once with `bun run build` / `npm run build`.)
  */
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve, relative, dirname, sep } from 'node:path';
 import { PKG_ROOT, BASE_DIR, DATA_DIR } from './paths.ts';
 
@@ -113,6 +113,56 @@ export function installSkills(root: string, dist = false): string[] {
     writeFileSync(target, skillBody(name, dist), 'utf8');
     return target;
   });
+}
+
+/** Agent key of Claude Code in AGENTS — the only agent with a PreToolUse hook to gate on. */
+export const CLAUDE_CODE = '1';
+
+/** Substring identifying our gate inside a settings.json hook command (used to update in place). */
+const GATE_ID = 'yt-summary-gate';
+
+/** How settings.json must invoke the gate — same portable form as the skill's engine commands. */
+export const gateCommand = (dist = false): string =>
+  dist
+    ? `${isBun ? 'bun' : 'node'} "${toProjectRel(join(DIST_DIR, GATE_ID + '.js'))}"`
+    : `bun run src/${GATE_ID}.ts`;
+
+type HookEntry = { matcher?: string; hooks?: { type?: string; command?: string }[] };
+export type Settings = { hooks?: { PreToolUse?: HookEntry[] } };
+
+/**
+ * Put the gate into a settings object: a PreToolUse hook on AskUserQuestion. Merges — every other
+ * setting and hook is left as found, and our own entry is updated in place, so reinstalling (or
+ * moving the package, which changes the baked path) never duplicates or clobbers anything.
+ */
+export function withGateHook(settings: Settings, command: string): Settings {
+  const preToolUse = ((settings.hooks ??= {}).PreToolUse ??= []);
+  const mine = preToolUse.find((e) => e.hooks?.some((h) => h.command?.includes(GATE_ID)));
+  const entry: HookEntry = { matcher: 'AskUserQuestion', hooks: [{ type: 'command', command }] };
+  if (mine) Object.assign(mine, entry);
+  else preToolUse.push(entry);
+  return settings;
+}
+
+/**
+ * Register the gate in a Claude Code project's `.claude/settings.json`.
+ *
+ * Returns the settings path written, or null when the file exists but isn't parseable JSON: a
+ * hand-edited config is not ours to rewrite, so the caller tells the user to add it by hand.
+ */
+export function installClaudeGate(projectDir: string, dist = false): string | null {
+  const target = join(projectDir, '.claude', 'settings.json');
+  let settings: Settings = {};
+  if (existsSync(target)) {
+    try {
+      settings = JSON.parse(readFileSync(target, 'utf8')) as Settings;
+    } catch {
+      return null;
+    }
+  }
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, JSON.stringify(withGateHook(settings, gateCommand(dist)), null, 2) + '\n', 'utf8');
+  return target;
 }
 
 /** The agent's skills ROOT inside a project folder (the project you open in the agent). */

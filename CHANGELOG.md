@@ -5,6 +5,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-08-04
+
+### Added
+- **Summary gate — the rating popup can no longer appear for a summary you never saw.**
+  Step B of the loop (paste the summary, *then* ask) is the one step an agent can drop with no
+  visible symptom: the popup still appears, you still answer, and the rating is recorded against
+  text nobody read — teaching the title filter from noise. Observed failure mode: the paste is
+  reliable while the sweep also returns a `skipped` list (there is other prose to write), and
+  gets dropped in iterations that return none, where the turn can open straight with the tool
+  call. `yt-summary-gate` runs as a Claude Code `PreToolUse` hook, blocks the popup when the
+  pending video's id is missing from the agent's own chat text, and tells it to paste first.
+  `init` and `install-skill` wire it into the project's `.claude/settings.json`, merging with
+  existing hooks and updating in place on reinstall; an unparseable settings file is left
+  untouched with a note to add the entry by hand (README → Rating gate). Other agents expose no
+  equivalent hook, so there the `SKILL.md` instruction — now explicit that step B is
+  unconditional — is what holds.
+
 ## [0.13.1] - 2026-07-31
 
 ### Fixed
@@ -270,6 +287,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[0.14.0]: https://github.com/michal90r/yt-briefing/compare/v0.13.1...v0.14.0
+[0.13.1]: https://github.com/michal90r/yt-briefing/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/michal90r/yt-briefing/compare/v0.12.3...v0.13.0
 [0.12.3]: https://github.com/michal90r/yt-briefing/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/michal90r/yt-briefing/compare/v0.12.1...v0.12.2

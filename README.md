@@ -134,6 +134,28 @@ Open your project in Claude Code or Cursor and run `/yt`. If it's not listed, st
 session. To install the skills again for another tool or project, run
 `npx yt-briefing install-skill` (it installs `/yt`, `/yt-transcribe`, and `/yt-search`).
 
+## Rating gate
+
+The loop only works if you see the summary *before* you rate it, and that is the one step an
+agent can silently drop — the popup still appears, you still answer, and the rating is recorded
+against a summary nobody read. On Claude Code the installer wires a `PreToolUse` hook into your
+project's `.claude/settings.json` that refuses the rating popup unless the video's summary is in
+the chat. It merges with your existing hooks and updates itself on reinstall. If that file isn't
+valid JSON the installer leaves it alone and says so — add the entry yourself:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "AskUserQuestion",
+        "hooks": [ { "type": "command", "command": "node \"node_modules/yt-briefing/dist/yt-summary-gate.js\"" } ] }
+    ]
+  }
+}
+```
+
+Other agents have no equivalent hook, so there the instruction in `SKILL.md` is what holds.
+
 ## Providers
 
 Any OpenAI-compatible endpoint works. Gemini 2.5 Flash is the easy default. It's fast, cheap,

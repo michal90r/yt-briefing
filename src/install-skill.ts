@@ -17,16 +17,22 @@
  * skills dir of whichever agent you pick.
  */
 
-import { AGENTS, installSkills, projectSkillsRoot, customSkillsRootDefault, isPackageDevCwd } from './lib/skill-install.ts';
+import { AGENTS, installSkills, projectSkillsRoot, customSkillsRootDefault, isPackageDevCwd, installClaudeGate, CLAUDE_CODE } from './lib/skill-install.ts';
 import { question } from './lib/prompt.ts';
 
 const ask = (q: string, def = ''): string => question(def ? `${q} [${def}]:` : `${q}:`).trim() || def;
 
-function done(targets: string[]): void {
+function done(targets: string[], gate?: string | null): void {
   console.log('\n  ✓ Installed:');
   for (const t of targets) console.log(`      ${t}`);
+  if (gate) console.log(`      ${gate}  (summary gate)`);
+  if (gate === null) console.log(`  ! .claude/settings.json isn't valid JSON — add the summary gate by hand (README → Rating gate).`);
   console.log('  Start a fresh agent session, then run  /yt  or  /yt-transcribe\n');
 }
+
+/** Claude Code only: the PreToolUse hook that blocks a rating popup with no summary in the chat. */
+const gateFor = (key: string, projectDir: string, dist: boolean): string | null | undefined =>
+  key === CLAUDE_CODE ? installClaudeGate(projectDir, dist) : undefined;
 
 // 1) which agent → which skills subdir
 console.log('\n  Install the /yt + /yt-transcribe skills — which agent?\n');
@@ -53,9 +59,11 @@ console.log('    2) Another project folder\n');
 
 if (ask('  Where', '1') === '2') {
   // A different project → the agent's cwd won't be the package, so bake the absolute dist commands.
-  done(installSkills(projectSkillsRoot(agentKey, ask('  Project folder', process.cwd())), true));
+  const projectDir = ask('  Project folder', process.cwd());
+  done(installSkills(projectSkillsRoot(agentKey, projectDir), true), gateFor(agentKey, projectDir, true));
 } else {
   // Current folder: shipped `bun run src` only when developing in the package clone under Bun;
   // otherwise (incl. consuming the package as a dependency) bake the compiled dist commands.
-  done(installSkills(projectSkillsRoot(agentKey, process.cwd()), !isPackageDevCwd()));
+  const dist = !isPackageDevCwd();
+  done(installSkills(projectSkillsRoot(agentKey, process.cwd()), dist), gateFor(agentKey, process.cwd(), dist));
 }

@@ -21,7 +21,7 @@ import {
   DATA_DIR, BASE_DIR, PKG_ROOT, CHANNELS_DIR, CHANNELS_MD, STATE_MD, CONFIG_JSON, profilePath, ROOT_ENV_PATH,
 } from './lib/paths.ts';
 import { loadEnv, missingEnv, REQUIRED_LLM, REQUIRED_YOUTUBE } from './lib/env.ts';
-import { AGENTS, installSkills, projectSkillsRoot, customSkillsRootDefault, isPackageDevCwd } from './lib/skill-install.ts';
+import { AGENTS, installSkills, projectSkillsRoot, customSkillsRootDefault, isPackageDevCwd, installClaudeGate, CLAUDE_CODE } from './lib/skill-install.ts';
 import { question } from './lib/prompt.ts';
 import { normalizeHandle, slugify, serializeChannels, serializeState, profileBody, baselineStateRow } from './lib/channels.ts';
 
@@ -133,6 +133,16 @@ function main(): void {
       ? installSkills(projectSkillsRoot(agentKey, process.cwd()), /* dist */ !isPackageDevCwd())
       : installSkills(customDir, /* dist */ true);
     for (const t of targets) console.log(`    skill → ${t}`);
+    // Claude Code also gets the summary gate — the hook that refuses a rating popup for a video
+    // whose summary was never pasted into the chat. No other agent exposes PreToolUse.
+    if (agentKey === CLAUDE_CODE) {
+      const gate = installClaudeGate(process.cwd(), /* dist */ !isPackageDevCwd());
+      console.log(
+        gate
+          ? `    gate  → ${gate}`
+          : `  ! .claude/settings.json isn't valid JSON — add the summary gate by hand (README → Rating gate).`,
+      );
+    }
   } catch (e) {
     console.log(`  ! Couldn't install the skills (${(e as Error).message}) — run  yt-briefing install-skill  later.`);
   }
