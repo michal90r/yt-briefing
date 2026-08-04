@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.1] - 2026-08-04
+
+### Fixed
+- **The summary gate could fail open without a trace.** The hook command 0.14.0 wrote into
+  `.claude/settings.json` used a project-relative path, but a hook is not guaranteed to run from
+  the project root — from anywhere else the command simply misses the file, the hook errors, and
+  the popup goes through ungated. Silent, and precisely the case the gate exists to catch. The
+  path is now anchored with `${CLAUDE_PROJECT_DIR}`, which stays machine-independent (still
+  nothing absolute in the committed settings). Reinstalling (`init` / `install-skill`) updates
+  the existing entry in place; a hand-written one should be corrected per README → Rating gate.
+
 ## [0.14.0] - 2026-08-04
 
 ### Added
@@ -287,6 +298,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[0.14.1]: https://github.com/michal90r/yt-briefing/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/michal90r/yt-briefing/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/michal90r/yt-briefing/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/michal90r/yt-briefing/compare/v0.12.3...v0.13.0

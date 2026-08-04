@@ -121,10 +121,17 @@ export const CLAUDE_CODE = '1';
 /** Substring identifying our gate inside a settings.json hook command (used to update in place). */
 const GATE_ID = 'yt-summary-gate';
 
-/** How settings.json must invoke the gate — same portable form as the skill's engine commands. */
+/**
+ * How settings.json must invoke the gate. Like the skill's engine commands it bakes nothing
+ * machine-absolute, but a hook may NOT assume its cwd — Claude Code's hooks reference states the
+ * working directory can vary, so a bare relative path would fail open, silently and invisibly
+ * (the popup appears ungated, which is exactly the bug the gate exists to catch). Hence the
+ * `$CLAUDE_PROJECT_DIR` prefix: still just a placeholder string in the committed JSON, resolved
+ * to the project root at hook time.
+ */
 export const gateCommand = (dist = false): string =>
   dist
-    ? `${isBun ? 'bun' : 'node'} "${toProjectRel(join(DIST_DIR, GATE_ID + '.js'))}"`
+    ? `${isBun ? 'bun' : 'node'} "\${CLAUDE_PROJECT_DIR}/${toProjectRel(join(DIST_DIR, GATE_ID + '.js'))}"`
     : `bun run src/${GATE_ID}.ts`;
 
 type HookEntry = { matcher?: string; hooks?: { type?: string; command?: string }[] };

@@ -148,7 +148,7 @@ valid JSON the installer leaves it alone and says so — add the entry yourself:
   "hooks": {
     "PreToolUse": [
       { "matcher": "AskUserQuestion",
-        "hooks": [ { "type": "command", "command": "node \"node_modules/yt-briefing/dist/yt-summary-gate.js\"" } ] }
+        "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PROJECT_DIR}/node_modules/yt-briefing/dist/yt-summary-gate.js\"" } ] }
     ]
   }
 }

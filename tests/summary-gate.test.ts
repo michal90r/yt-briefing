@@ -90,4 +90,8 @@ describe('gateCommand', () => {
   it('points at the compiled gate when baking for a consumer', () => {
     expect(gateCommand(true)).toMatch(/(node|bun) "[^"\n]*dist\/yt-summary-gate\.js"/);
   });
+
+  it('anchors the path so it cannot depend on the hook\'s cwd (a hook may run anywhere)', () => {
+    expect(gateCommand(true)).toContain('"${CLAUDE_PROJECT_DIR}/');
+  });
 });
