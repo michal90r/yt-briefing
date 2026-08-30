@@ -5,6 +5,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.2] - 2026-08-30
+
+### Fixed
+- **The summary gate blocked every video, even when the summary was pasted.** The agent pastes
+  the summary and opens the popup in the same turn, and the harness writes those as two separate
+  transcript entries, asynchronously — so the hook could run while only the tool call had
+  reached disk and conclude the paste never happened. The block fired on every single video and
+  cleared on a blind retry, which is the worst possible shape: a real bug that trains you to
+  ignore the gate. (Verified: the same transcript and pending file that blocked, replayed
+  seconds later, allowed.) The transcript is now polled for up to 5 seconds instead of read
+  once. A turn that genuinely skips the paste never writes the line, so it is still blocked —
+  just five seconds later.
+
 ## [0.14.1] - 2026-08-04
 
 ### Fixed
