@@ -1,101 +1,46 @@
 // The summary gate is what stops a rating being recorded against a summary the user never saw
-// (see src/yt-summary-gate.ts). Two things must hold: it recognises the rating popup and nothing
-// else, and it only accepts the assistant's own text as proof the summary was shown — an id
-// travelling through a tool call or its result is invisible to the user.
+// (see src/yt-summary-gate.ts). Two things must hold: it recognises the rating WRITE and nothing
+// else — it is matched on Bash, so it sees every shell command in the session — and it only
+// accepts the assistant's own text as proof the summary was shown; an id travelling through a
+// tool call or its result is invisible to the user.
 // Pure logic only, no disk access — same hermetic style as the rest of tests/.
 // Globals only — runs under vitest and bun test.
-import { isRatingPopup, summaryWasPasted, waitForSummary } from '../src/lib/summary-gate.ts';
+import { isRatingWrite, summaryWasPasted } from '../src/lib/summary-gate.ts';
 import { withGateHook, gateCommand, type Settings } from '../src/lib/skill-install.ts';
 
-const popup = (...labels: string[]) => ({
-  tool_input: { questions: [{ options: labels.map((label) => ({ label })) }] },
-});
+const bash = (command: string) => ({ tool_name: 'Bash', tool_input: { command } });
 
-describe('isRatingPopup', () => {
-  it('recognises the rating popup by its pinned labels', () => {
-    expect(isRatingPopup(popup('OK', 'Weak', 'Research'))).toBe(true);
+describe('isRatingWrite', () => {
+  it('recognises the rating write the skill issues', () => {
+    expect(isRatingWrite(bash('bun "node_modules/yt-briefing/dist/yt-rating.js" --rating 1'))).toBe(true);
+    expect(isRatingWrite(bash('node dist/yt-rating.js --rating 0 --comment "skip shorts"'))).toBe(true);
+    expect(isRatingWrite(bash('bun run src/yt-rating.ts --rating 1'))).toBe(true);
   });
 
-  it('tolerates case and padding (the labels are typed by an agent)', () => {
-    expect(isRatingPopup(popup(' ok ', 'weak', ' RESEARCH'))).toBe(true);
+  it('waves through the rest of the loop and any unrelated shell work', () => {
+    // Matched on Bash, so it is asked about every command in the session — it must be cheap and
+    // decline fast on all of them.
+    expect(isRatingWrite(bash('bun "node_modules/yt-briefing/dist/yt-sweep.js" --reset'))).toBe(false);
+    expect(isRatingWrite(bash('bun dist/yt-transcript.js abc123 --lang auto'))).toBe(false);
+    expect(isRatingWrite(bash('git status'))).toBe(false);
+    expect(isRatingWrite(bash('echo --rating 1'))).toBe(false); // no yt-rating script
+    expect(isRatingWrite(bash('cat dist/yt-rating.js'))).toBe(false); // reading it is not writing
   });
 
-  it('ignores /yt-search triage and any other question', () => {
-    expect(isRatingPopup(popup('Keep', 'Skip'))).toBe(false);
-    expect(isRatingPopup(popup('Yes', 'No'))).toBe(false);
-    expect(isRatingPopup({})).toBe(false);
-  });
-});
-
-describe('summaryWasPasted', () => {
-  const id = 'dQw4w9WgXcQ';
-  const line = (o: unknown) => JSON.stringify(o);
-
-  it('accepts an assistant text block carrying the video id', () => {
-    const t = line({ message: { role: 'assistant', content: [{ type: 'text', text: `watch?v=${id}` }] } });
-    expect(summaryWasPasted(t, id)).toBe(true);
-  });
-
-  it('rejects a transcript where the id only rode in on a tool call', () => {
-    const t = [
-      line({ message: { role: 'assistant', content: [{ type: 'tool_use', input: { command: `sweep ${id}` } }] } }),
-      line({ message: { role: 'user', content: [{ type: 'tool_result', content: `summary of ${id}` }] } }),
-    ].join('\n');
-    expect(summaryWasPasted(t, id)).toBe(false);
-  });
-
-  it('rejects an empty or unrelated transcript, and survives malformed lines', () => {
-    expect(summaryWasPasted('', id)).toBe(false);
-    expect(summaryWasPasted(`{not json ${id}}\n`, id)).toBe(false);
-    const other = line({ message: { role: 'assistant', content: [{ type: 'text', text: 'watch?v=abc' }] } });
-    expect(summaryWasPasted(other, id)).toBe(false);
-  });
-});
-
-describe('waitForSummary', () => {
-  const id = 'dQw4w9WgXcQ';
-  const pasted = JSON.stringify({
-    message: { role: 'assistant', content: [{ type: 'text', text: `watch?v=${id}` }] },
-  });
-  // Fake clock: the deadline is driven by `now`, so the tests never actually wait.
-  const clock = () => {
-    let t = 0;
-    return { now: () => t, sleep: async (ms: number) => void (t += ms) };
-  };
-
-  it('returns as soon as the id is there, without waiting', async () => {
-    let reads = 0;
-    const ok = await waitForSummary(() => (reads++, pasted), id, clock());
-    expect(ok).toBe(true);
-    expect(reads).toBe(1);
-  });
-
-  it('waits out a transcript the harness has not flushed yet (the write-lag bug)', async () => {
-    let reads = 0;
-    const ok = await waitForSummary(() => (++reads < 3 ? '' : pasted), id, clock());
-    expect(ok).toBe(true);
-    expect(reads).toBe(3);
-  });
-
-  it('keeps waiting through a torn read instead of calling it absent', async () => {
-    let reads = 0;
-    const ok = await waitForSummary(() => (++reads < 2 ? null : pasted), id, clock());
-    expect(ok).toBe(true);
-  });
-
-  it('still blocks a turn that never pastes, once the window closes', async () => {
-    const ok = await waitForSummary(() => '', id, { ...clock(), timeoutMs: 1000, intervalMs: 200 });
-    expect(ok).toBe(false);
+  it('ignores every other tool (the popup included — gating it cannot work)', () => {
+    expect(isRatingWrite({ tool_name: 'AskUserQuestion', tool_input: {} })).toBe(false);
+    expect(isRatingWrite({ tool_name: 'Edit', tool_input: { command: 'yt-rating --rating 1' } })).toBe(false);
+    expect(isRatingWrite({})).toBe(false);
   });
 });
 
 describe('withGateHook', () => {
   const entries = (s: Settings) => s.hooks?.PreToolUse ?? [];
 
-  it('adds a PreToolUse hook on AskUserQuestion to empty settings', () => {
+  it('adds a PreToolUse hook on Bash to empty settings (the rating write, not the popup)', () => {
     const s = withGateHook({}, 'node gate.js');
     expect(entries(s)).toHaveLength(1);
-    expect(entries(s)[0].matcher).toBe('AskUserQuestion');
+    expect(entries(s)[0].matcher).toBe('Bash');
     expect(entries(s)[0].hooks?.[0]).toEqual({ type: 'command', command: 'node gate.js' });
   });
 
@@ -114,6 +59,20 @@ describe('withGateHook', () => {
     s = withGateHook(s, 'node moved/yt-summary-gate.js');
     expect(entries(s)).toHaveLength(1);
     expect(entries(s)[0].hooks?.[0].command).toBe('node moved/yt-summary-gate.js');
+  });
+
+  it('re-points a pre-0.15.0 install from the popup to the rating write', () => {
+    // Upgrading must not leave the old AskUserQuestion entry behind: it would block every popup.
+    const stale = {
+      hooks: {
+        PreToolUse: [
+          { matcher: 'AskUserQuestion', hooks: [{ type: 'command', command: 'node dist/yt-summary-gate.js' }] },
+        ],
+      },
+    };
+    const s = withGateHook(stale, 'node dist/yt-summary-gate.js');
+    expect(entries(s)).toHaveLength(1);
+    expect(entries(s)[0].matcher).toBe('Bash');
   });
 });
 
