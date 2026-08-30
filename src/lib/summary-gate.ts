@@ -44,3 +44,40 @@ export function summaryWasPasted(transcript: string, videoId: string): boolean {
   }
   return false;
 }
+
+/**
+ * Same question as `summaryWasPasted`, but tolerant of the harness writing the transcript late.
+ *
+ * The agent pastes the summary and calls the popup in one turn, so the text block and the tool
+ * call are separate JSONL entries written by the harness asynchronously — the hook can run
+ * while only the tool call has reached disk. A single read then reports "not pasted" for a turn
+ * that did paste, and the block fires on every single video (observed 2026-08-30: the same
+ * transcript and pending file that blocked, replayed seconds later, allowed).
+ *
+ * So poll instead of guessing: re-read until the id shows up or the window closes. A turn that
+ * genuinely skipped the paste never produces the line, so the gate still blocks — just later.
+ * `read` returning null (a torn read mid-write) counts as "not yet", not as proof of absence.
+ */
+export async function waitForSummary(
+  read: () => string | null,
+  videoId: string,
+  opts: {
+    timeoutMs?: number;
+    intervalMs?: number;
+    now?: () => number;
+    sleep?: (ms: number) => Promise<void>;
+  } = {},
+): Promise<boolean> {
+  const timeoutMs = opts.timeoutMs ?? 5000;
+  const intervalMs = opts.intervalMs ?? 200;
+  const now = opts.now ?? (() => Date.now());
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const deadline = now() + timeoutMs;
+
+  for (;;) {
+    const transcript = read();
+    if (transcript !== null && summaryWasPasted(transcript, videoId)) return true;
+    if (now() >= deadline) return false;
+    await sleep(intervalMs);
+  }
+}

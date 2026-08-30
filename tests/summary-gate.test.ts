@@ -4,7 +4,7 @@
 // travelling through a tool call or its result is invisible to the user.
 // Pure logic only, no disk access — same hermetic style as the rest of tests/.
 // Globals only — runs under vitest and bun test.
-import { isRatingPopup, summaryWasPasted } from '../src/lib/summary-gate.ts';
+import { isRatingPopup, summaryWasPasted, waitForSummary } from '../src/lib/summary-gate.ts';
 import { withGateHook, gateCommand, type Settings } from '../src/lib/skill-install.ts';
 
 const popup = (...labels: string[]) => ({
@@ -49,6 +49,43 @@ describe('summaryWasPasted', () => {
     expect(summaryWasPasted(`{not json ${id}}\n`, id)).toBe(false);
     const other = line({ message: { role: 'assistant', content: [{ type: 'text', text: 'watch?v=abc' }] } });
     expect(summaryWasPasted(other, id)).toBe(false);
+  });
+});
+
+describe('waitForSummary', () => {
+  const id = 'dQw4w9WgXcQ';
+  const pasted = JSON.stringify({
+    message: { role: 'assistant', content: [{ type: 'text', text: `watch?v=${id}` }] },
+  });
+  // Fake clock: the deadline is driven by `now`, so the tests never actually wait.
+  const clock = () => {
+    let t = 0;
+    return { now: () => t, sleep: async (ms: number) => void (t += ms) };
+  };
+
+  it('returns as soon as the id is there, without waiting', async () => {
+    let reads = 0;
+    const ok = await waitForSummary(() => (reads++, pasted), id, clock());
+    expect(ok).toBe(true);
+    expect(reads).toBe(1);
+  });
+
+  it('waits out a transcript the harness has not flushed yet (the write-lag bug)', async () => {
+    let reads = 0;
+    const ok = await waitForSummary(() => (++reads < 3 ? '' : pasted), id, clock());
+    expect(ok).toBe(true);
+    expect(reads).toBe(3);
+  });
+
+  it('keeps waiting through a torn read instead of calling it absent', async () => {
+    let reads = 0;
+    const ok = await waitForSummary(() => (++reads < 2 ? null : pasted), id, clock());
+    expect(ok).toBe(true);
+  });
+
+  it('still blocks a turn that never pastes, once the window closes', async () => {
+    const ok = await waitForSummary(() => '', id, { ...clock(), timeoutMs: 1000, intervalMs: 200 });
+    expect(ok).toBe(false);
   });
 });
 
