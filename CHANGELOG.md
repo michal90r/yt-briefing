@@ -5,6 +5,32 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-08-31
+
+### Changed
+- **The summary gate now guards the rating write instead of the popup — the only place it can
+  actually work.** Gating `AskUserQuestion` was unworkable in principle: the harness writes a
+  message's entries to the transcript only once that message is *complete*, i.e. after its tool
+  calls return, and the skill pastes the summary and opens the popup in a single message. The
+  hook therefore asked the transcript for text that could not be there yet, and the write it was
+  waiting for could not happen until the hook returned. It blocked every video and cleared on a
+  blind retry — a real check that fires constantly and clears when ignored, which is worse than
+  no check. Measured 2026-08-30: a marker inside a long text block was absent from the transcript
+  during its own message's tool call and present in the next message immediately. The rating is
+  recorded by a separate `yt-rating` call in the following message, where the evidence does
+  exist, so the hook moved there and is now matched on `Bash`.
+
+  The tradeoff is stated plainly: a genuinely skipped paste is caught *after* you answer the
+  popup, so that one answer is wasted and the agent has to paste and re-ask. Nothing reaches a
+  channel profile unseen, which is what the gate was ever for. `install-skill` / `init` re-point
+  an existing install; a hand-written entry needs its matcher changed from `AskUserQuestion` to
+  `Bash` (README → Rating gate).
+
+### Removed
+- **The 5-second transcript poll from 0.14.2.** It treated the above as a timing lag. It was not
+  one — the write is triggered by the message completing, not by elapsed time — so the poll only
+  made every block five seconds slower. Ordinary shell commands now pass the hook in ~20 ms.
+
 ## [0.14.2] - 2026-08-30
 
 ### Fixed

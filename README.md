@@ -139,20 +139,28 @@ session. To install the skills again for another tool or project, run
 The loop only works if you see the summary *before* you rate it, and that is the one step an
 agent can silently drop — the popup still appears, you still answer, and the rating is recorded
 against a summary nobody read. On Claude Code the installer wires a `PreToolUse` hook into your
-project's `.claude/settings.json` that refuses the rating popup unless the video's summary is in
-the chat. It merges with your existing hooks and updates itself on reinstall. If that file isn't
-valid JSON the installer leaves it alone and says so — add the entry yourself:
+project's `.claude/settings.json` that refuses to *record* a rating unless the video's summary is
+in the chat. It merges with your existing hooks and updates itself on reinstall. If that file
+isn't valid JSON the installer leaves it alone and says so — add the entry yourself:
 
 ```json
 {
   "hooks": {
     "PreToolUse": [
-      { "matcher": "AskUserQuestion",
+      { "matcher": "Bash",
         "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PROJECT_DIR}/node_modules/yt-briefing/dist/yt-summary-gate.js\"" } ] }
     ]
   }
 }
 ```
+
+It watches the rating write rather than the popup, because the popup cannot be gated: the agent
+pastes the summary and opens the popup in one message, and the harness only writes a message to
+the transcript once that message is complete — so the evidence does not exist yet at popup time.
+The rating write is a separate call in the next message, where it does. The matcher is `Bash`, so
+the hook is invoked on ordinary shell commands too; it reads the command line and exits before
+touching anything. The tradeoff: a genuinely skipped paste is caught after you have answered, so
+that one answer is wasted — but nothing reaches the channel profile unseen.
 
 Other agents have no equivalent hook, so there the instruction in `SKILL.md` is what holds.
 

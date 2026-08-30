@@ -125,7 +125,7 @@ const GATE_ID = 'yt-summary-gate';
  * How settings.json must invoke the gate. Like the skill's engine commands it bakes nothing
  * machine-absolute, but a hook may NOT assume its cwd — Claude Code's hooks reference states the
  * working directory can vary, so a bare relative path would fail open, silently and invisibly
- * (the popup appears ungated, which is exactly the bug the gate exists to catch). Hence the
+ * (the rating is written ungated, which is exactly the bug the gate exists to catch). Hence the
  * `$CLAUDE_PROJECT_DIR` prefix: still just a placeholder string in the committed JSON, resolved
  * to the project root at hook time.
  */
@@ -138,14 +138,16 @@ type HookEntry = { matcher?: string; hooks?: { type?: string; command?: string }
 export type Settings = { hooks?: { PreToolUse?: HookEntry[] } };
 
 /**
- * Put the gate into a settings object: a PreToolUse hook on AskUserQuestion. Merges — every other
- * setting and hook is left as found, and our own entry is updated in place, so reinstalling (or
- * moving the package, which changes the baked path) never duplicates or clobbers anything.
+ * Put the gate into a settings object: a PreToolUse hook on Bash, which is where the rating is
+ * written (gating the popup instead cannot work — see src/yt-summary-gate.ts). Merges — every
+ * other setting and hook is left as found, and our own entry is updated in place, so
+ * reinstalling (or upgrading from the pre-0.15.0 AskUserQuestion matcher) never duplicates or
+ * clobbers anything.
  */
 export function withGateHook(settings: Settings, command: string): Settings {
   const preToolUse = ((settings.hooks ??= {}).PreToolUse ??= []);
   const mine = preToolUse.find((e) => e.hooks?.some((h) => h.command?.includes(GATE_ID)));
-  const entry: HookEntry = { matcher: 'AskUserQuestion', hooks: [{ type: 'command', command }] };
+  const entry: HookEntry = { matcher: 'Bash', hooks: [{ type: 'command', command }] };
   if (mine) Object.assign(mine, entry);
   else preToolUse.push(entry);
   return settings;
