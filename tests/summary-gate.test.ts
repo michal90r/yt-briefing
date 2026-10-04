@@ -2,7 +2,8 @@
 // (see src/yt-summary-gate.ts). Two things must hold: it recognises the rating WRITE and nothing
 // else — it is matched on Bash, so it sees every shell command in the session — and it only
 // accepts the assistant's own text as proof the summary was shown; an id travelling through a
-// tool call or its result is invisible to the user.
+// tool call or its result is invisible to the user — except the rating popup, whose question
+// text the user reads while rating.
 // Pure logic only, no disk access — same hermetic style as the rest of tests/.
 // Globals only — runs under vitest and bun test.
 import { isRatingWrite, summaryWasPasted } from '../src/lib/summary-gate.ts';
@@ -31,6 +32,37 @@ describe('isRatingWrite', () => {
     expect(isRatingWrite({ tool_name: 'AskUserQuestion', tool_input: {} })).toBe(false);
     expect(isRatingWrite({ tool_name: 'Edit', tool_input: { command: 'yt-rating --rating 1' } })).toBe(false);
     expect(isRatingWrite({})).toBe(false);
+  });
+});
+
+describe('summaryWasPasted', () => {
+  const id = 'Nd6fDAU8YQE';
+  const line = (message: unknown) => JSON.stringify({ message });
+  const assistant = (...content: unknown[]) => line({ role: 'assistant', content });
+  const transcript = (...lines: string[]) => lines.join('\n');
+
+  it('accepts the summary pasted as chat text', () => {
+    expect(summaryWasPasted(assistant({ type: 'text', text: `### @ch — "t"\nhttps://youtube.com/watch?v=${id}` }), id)).toBe(true);
+  });
+
+  it('accepts the summary carried in the rating popup, even before the chat text is on disk', () => {
+    const popup = assistant({
+      type: 'tool_use',
+      name: 'AskUserQuestion',
+      input: { questions: [{ question: `@ch — "t" (${id}, short)\n\n1. ...\n\nRating?`, options: [] }] },
+    });
+    expect(summaryWasPasted(popup, id)).toBe(true);
+  });
+
+  it('rejects the id travelling only through other tool calls or tool results', () => {
+    const bashCall = assistant({ type: 'tool_use', name: 'Bash', input: { command: `bun dist/yt-transcript.js ${id}` } });
+    const result = line({ role: 'user', content: [{ type: 'tool_result', content: `{"pending":{"videoId":"${id}"}}` }] });
+    expect(summaryWasPasted(transcript(bashCall, result), id)).toBe(false);
+  });
+
+  it('rejects a popup about a different video and survives junk lines', () => {
+    const otherPopup = assistant({ type: 'tool_use', name: 'AskUserQuestion', input: { questions: [{ question: '(zzzzzzzzzzz)' }] } });
+    expect(summaryWasPasted(transcript('not json ' + id, otherPopup, ''), id)).toBe(false);
   });
 });
 
