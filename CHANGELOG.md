@@ -5,6 +5,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **The summary gate now also accepts the rating popup as proof the summary was shown.** It used
+  to look only for the video id in the assistant's chat text, but the harness can persist text
+  blocks late — in background sessions only once the turn ends — so ratings were blocked even
+  though the user had read the summary in the popup and answered it. The popup's `AskUserQuestion`
+  entry is on disk as soon as the call is made, and its question text is what the user actually
+  reads while rating. Measured 2026-10-04: the popup entry with the id was in the transcript, the
+  text block with the same id was not, across several messages of one turn. Other tool calls and
+  tool results still don't count. The `/yt` skill's step C now asks for the summary inside the
+  question text, opening with the channel, title and video id.
+
 ## [0.15.0] - 2026-08-31
 
 ### Changed
