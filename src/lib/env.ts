@@ -20,7 +20,6 @@ export function loadEnv(): void {
 }
 
 /** The required vars per capability — single source of truth for the preflight checks. */
-export const REQUIRED_LLM = ['YT_BRIEFING_LLM_BASE_URL', 'YT_BRIEFING_LLM_API_KEY', 'YT_BRIEFING_LLM_MODEL'];
 export const REQUIRED_YOUTUBE = ['YT_BRIEFING_YOUTUBE_API_KEY'];
 
 /** Names from `names` that are missing or empty in the environment, in order. */

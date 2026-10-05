@@ -36,8 +36,8 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { loadEnv, missingEnv, missingEnvMessage, REQUIRED_LLM, REQUIRED_YOUTUBE } from './lib/env.ts';
-import { chat, getModel } from './lib/llm.ts';
+import { loadEnv, missingEnv, missingEnvMessage, REQUIRED_YOUTUBE } from './lib/env.ts';
+import { chat, claudeMissing } from './lib/llm.ts';
 import { outputLang } from './lib/config.ts';
 import { fetchChannelVideos, type Video } from './lib/yt-api.ts';
 import { normalizeHandle } from './lib/channels.ts';
@@ -136,7 +136,7 @@ Output ONLY a raw JSON array, best first, no fences:
 [{"id":"VIDEO_ID","keep":true,"score":0-100,"reason":"max 12 words"},...]
 Set keep=false for anything not relevant to the intent.`;
   try {
-    const out = await chat(prompt, { system: 'You output ONLY a raw JSON array as instructed.', temperature: 0 });
+    const out = await chat(prompt, { system: 'You output ONLY a raw JSON array as instructed.' });
     const arr = parseJsonArray(out);
     if (!arr) return [];
     const byId = new Map(items.map(h => [h.videoId, h]));
@@ -190,7 +190,6 @@ Language: natural ${LANG}; foreign words only for proper nouns or established te
 Output ONLY the summary OR 'OFFTOPIC: <reason>'. No preamble.`;
   return chat(prompt, {
     system: `You are a research-grade video summarizer writing in ${LANG}. Output only the summary or 'OFFTOPIC: <reason>'.`,
-    model: getModel(),
   });
 }
 
@@ -208,7 +207,7 @@ Write:
 - A final recommendation with the reasoning, and who it's for.
 
 Language: natural ${LANG}; foreign words only for proper nouns or established technical terms. Cite videos as [1], [2]… matching the order above. Output only the comparison.`;
-  return chat(prompt, { system: `You synthesize a decision-grade comparison in ${LANG}. No preamble.`, model: getModel() });
+  return chat(prompt, { system: `You synthesize a decision-grade comparison in ${LANG}. No preamble.` });
 }
 
 /** Lazy yield: advance to the next candidate that has a transcript, summarize, emit. */
@@ -236,12 +235,12 @@ async function yieldNext(queue: SearchQueue): Promise<never> {
 }
 
 async function main(): Promise<void> {
-  // LLM is needed on every path (rerank, summaries, compare). Fail fast naming any missing var
+  // The `claude` CLI is needed on every path (rerank, summaries, compare). Fail fast if it's missing
   // (the throw is turned into a status:"error" by the .catch below). YouTube is checked separately,
   // only when building a fresh queue (the compare/keep/skip paths work off cache, no API).
   {
-    const missing = missingEnv(REQUIRED_LLM);
-    if (missing.length) emit({ status: 'error', error: missingEnvMessage(missing) });
+    const noClaude = claudeMissing();
+    if (noClaude) emit({ status: 'error', error: noClaude });
   }
 
   // --compare: synthesize from kept summaries.

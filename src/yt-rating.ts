@@ -2,6 +2,7 @@
 /**
  * Usage:
  *   bun src/yt-rating.ts --rating 0|1 [--comment "..."]
+ *   bun src/yt-rating.ts --raw-comment "..." [--rating 0|1]
  *
  * Channel / id / title / type default to <DATA_DIR>/.cache/pending.json (written by
  * yt-sweep.ts) so the agent only passes --rating (+ optional --comment) — no fragile
@@ -12,13 +13,21 @@
  *   1 = neutral      → bump the state pointer only (video seen, no signal), profile untouched.
  *   0 = worthless    → append a negative few-shot to `## Skip titles` (FIFO cap, default 10).
  *   comment          → append a durable rule to `## Notes`, seen by both filters.
+ *   raw comment      → the user's words as typed: distilled into a rule (and, unless --rating is
+ *                      given, the rating it implies) through `claude -p`, then stored as above.
+ *
+ * After a recorded rating, `after_rate` from config.json (if set) runs detached from the project
+ * root — e.g. a script that commits DATA_DIR. The engine never runs VCS itself.
  *
  * Direct durable commit — no rolling buffer, no consolidation. Idempotent: identical
  * bullets are de-duplicated; a state.md re-bump is a no-op.
  */
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { spawn } from 'node:child_process';
 import { loadEnv } from './lib/env.ts';
+import { loadConfig } from './lib/config.ts';
+import { distillComment } from './lib/distill.ts';
 import { parseChannels, appendSkipTitle, appendNote, bumpStatePointer, type ChannelEntry } from './lib/yt-lib.ts';
 import { CHANNELS_MD, STATE_MD, PENDING_FILE, QUEUE_FILE, profilePath } from './lib/paths.ts';
 
@@ -29,8 +38,9 @@ interface Args {
   id: string;
   title: string;
   type: 'longform' | 'short' | 'live';
-  rating: number;
+  rating: number | null;
   comment: string;
+  rawComment: string;
   baseline: boolean;
   cap: number;
   noState: boolean;
@@ -58,26 +68,27 @@ function parseArgs(argv: string[]): Args {
   const type = getArg(argv, '--type') ?? pending.type ?? null;
   const ratingRaw = getArg(argv, '--rating');
   const comment = getArg(argv, '--comment') ?? '';
+  const rawComment = (getArg(argv, '--raw-comment') ?? '').trim();
   const baseline = argv.includes('--baseline') || pending.is_baseline === true;
   const noState = argv.includes('--no-state');
   const capRaw = getArg(argv, '--cap');
 
-  if (!channel || !id || !title || !type || !ratingRaw) {
-    console.error('Usage: yt-briefing rate --rating 0|1 [--comment "..."]  (channel/id/title/type default to .cache/pending.json; override with --channel @X --id Y --title "..." --type longform|short|live) [--baseline] [--cap 10] [--no-state]');
+  if (!channel || !id || !title || !type || (!ratingRaw && !rawComment)) {
+    console.error('Usage: yt-briefing rate --rating 0|1 [--comment "..."] | --raw-comment "..." [--rating 0|1]  (channel/id/title/type default to .cache/pending.json; override with --channel @X --id Y --title "..." --type longform|short|live) [--baseline] [--cap 10] [--no-state]');
     process.exit(1);
   }
   if (!['longform', 'short', 'live'].includes(type)) {
     console.error(`Invalid --type: ${type}`);
     process.exit(1);
   }
-  const rating = parseInt(ratingRaw, 10);
+  const rating = ratingRaw === null ? null : parseInt(ratingRaw, 10);
   // Permissive 0..5 so older profiles / scripts keep working; the live UI emits only 0|1.
-  if (!Number.isFinite(rating) || rating < 0 || rating > 5) {
+  if (rating !== null && (!Number.isFinite(rating) || rating < 0 || rating > 5)) {
     console.error(`Invalid --rating: ${ratingRaw} (must be 0 or 1)`);
     process.exit(1);
   }
   const cap = capRaw ? parseInt(capRaw, 10) : 10;
-  return { channel, id, title, type: type as Args['type'], rating, comment, baseline, cap, noState };
+  return { channel, id, title, type: type as Args['type'], rating, comment, rawComment, baseline, cap, noState };
 }
 
 const args = parseArgs(process.argv.slice(2));
@@ -97,15 +108,30 @@ if (!existsSync(profile)) {
 
 const date = new Date().toISOString().slice(0, 10);
 
+// 0. A raw comment becomes a rule (+ the implied rating unless one was given explicitly).
+let rule = args.comment.trim();
+let rating = args.rating;
+if (args.rawComment) {
+  try {
+    const d = await distillComment(args.rawComment, { channel: args.channel, title: args.title, type: args.type });
+    rule = d.rule;
+    rating ??= d.rating;
+  } catch (e) {
+    console.error(`Comment not recorded: ${(e as Error).message}`);
+    process.exit(1);
+  }
+}
+if (rating === null) rating = 1;
+
 // 1. Durable profile writes (no buffer, no consolidation):
 //    rating=0 → negative few-shot; comment → Notes rule. rating=1 w/o comment → nothing.
 const profileBefore = readFileSync(profile, 'utf8');
 let profileAfter = profileBefore;
-if (args.rating === 0) {
+if (rating === 0) {
   profileAfter = appendSkipTitle(profileAfter, { title: args.title, type: args.type }, args.cap);
 }
-if (args.comment && args.comment.trim()) {
-  profileAfter = appendNote(profileAfter, args.comment.trim());
+if (rule) {
+  profileAfter = appendNote(profileAfter, rule);
 }
 if (profileAfter !== profileBefore) {
   writeFileSync(profile, profileAfter, 'utf8');
@@ -136,8 +162,17 @@ if (!args.noState && existsSync(QUEUE_FILE)) {
   } catch { /* corrupt / foreign queue → ignore; the next sweep rebuilds it */ }
 }
 
+// 4. The user's after-rate command (e.g. commit DATA_DIR to git). Detached: the rating is already
+//    durable on disk, so a slow or failing command must not hold or fail the rating.
+const afterRate = loadConfig().after_rate;
+if (afterRate) {
+  spawn(afterRate, { shell: true, detached: true, stdio: 'ignore' }).unref();
+}
+
 console.log(JSON.stringify({
   ok: true,
   profile: `channels/${ch.slug}.md`,
+  rating,
+  ...(rule ? { rule } : {}),
   state_bumped: stateBumped,
 }));

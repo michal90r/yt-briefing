@@ -1,7 +1,7 @@
 {
   "name": "yt-briefing",
-  "version": "0.15.1",
-  "description": "A self-learning YouTube briefing engine: it sweeps the channels you follow, filters noise in two stages (title, then transcript), summarizes the rest in your language, and adapts to your ratings — one video at a time.",
+  "version": "1.0.0",
+  "description": "A self-learning YouTube briefing for Claude Code: it sweeps the channels you follow, filters noise in two stages (title, then transcript), gives you a short briefing of the rest in your language in a pane, and adapts to your ratings — one video at a time.",
   "type": "module",
   "bin": {
     "yt-briefing": "dist/cli.js"
@@ -10,6 +10,8 @@
     "dist",
     "data.example",
     ".claude/skills",
+    "plugin",
+    "!plugin/**/*.test.tsx",
     "docs",
     "README.md",
     "LICENSE"
@@ -32,12 +34,11 @@
   "keywords": [
     "youtube",
     "transcript",
-    "summary",
     "briefing",
-    "llm",
-    "openai-compatible",
-    "agent",
-    "claude"
+    "claude-code",
+    "claude-code-plugin",
+    "claude",
+    "agent"
   ],
   "license": "MIT",
   "repository": {

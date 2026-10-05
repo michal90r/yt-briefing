@@ -5,6 +5,48 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-10-05
+
+yt-briefing now runs inside Claude Code only. Breaking: the LLM provider, the keys for it, the
+other agents and the chat-driven `/yt` skill are gone. Run `npx yt-briefing install-skill` once
+after upgrading. Your channels, profiles and ratings carry over unchanged.
+
+### Changed
+- **Filtering and summaries run on your Claude Code login, not a second model.** Every LLM call is
+  now a headless `claude -p` run with no tools, no settings sources (so no project hooks), no MCP
+  servers and no saved session. One prompt in, one answer out, the same contract as before.
+  `ANTHROPIC_API_KEY` is removed from that child's environment, because Claude Code prefers it
+  over the login and would bill every summary as API usage. The model is `haiku` by default and
+  `YT_BRIEFING_MODEL` takes any alias or model name `claude --model` accepts. Measured
+  2026-10-05: about 4 s per short call on the subscription, with no CLAUDE.md or hooks in context.
+- **`/yt` is a pane, not a chat loop.** A Claude Code mod (`plugin/`, installed into
+  `.claude/skills/yt-briefing/`, loaded by Claude Code as `yt-briefing@skills-dir`) shows the
+  summary with four keys: OK, Weak, Research, Stop, plus a comment field. Each step runs the engine
+  directly, so rating a video costs no model turn, and the next summary is usually prefetched.
+  Research closes the pane and hands the video, its briefing and the transcript command to the
+  session as your message.
+- **Comments are distilled by the engine.** `yt-rating --raw-comment "<your words>"` turns a typed
+  comment into one rule for the channel's `## Notes` and infers the rating (0 if clearly negative),
+  through the same `claude -p` call. This used to be the agent's job in the chat loop.
+- **`install-skill` and `init` install for Claude Code only**: the mod plus the `/yt-transcribe` and
+  `/yt-search` skills. Upgrading removes the 0.x `/yt` skill (only if it is ours) and the summary
+  gate from `.claude/settings.json`, leaving every other hook as found.
+
+### Added
+- **`after_rate` in `config.json`**: a shell command the engine runs (detached, from the project
+  root) after every recorded rating, e.g. a script that commits the data folder. It replaces the
+  `PostToolUse` hook recipe, which cannot fire once ratings no longer go through the Bash tool.
+  The engine itself still never runs git.
+- `rating_needed` carries `lang`, the language the summary is written in.
+
+### Removed
+- **The OpenAI-compatible client and `YT_BRIEFING_LLM_BASE_URL`, `_API_KEY`, `_MODEL`.** A missing
+  `claude` CLI is now the named preflight error instead.
+- **Cursor, Codex and custom-folder installs.** The Agent Skills route needed a model-driven rating
+  loop, which the pane replaces.
+- **The summary gate (`yt-summary-gate`).** It existed to prove the model had shown the summary
+  before a rating was recorded. The pane shows the summary itself, so there is nothing to prove.
+
 ## [0.15.1] - 2026-10-04
 
 ### Fixed

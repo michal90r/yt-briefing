@@ -16,6 +16,10 @@ It also gets better the more you use it. You give each summary a quick rating, w
 or not, and from that it learns what to keep showing you and what to drop. Over time the queue
 becomes yours: less noise, more of what you care about.
 
+yt-briefing runs inside [Claude Code](https://claude.com/claude-code). `/yt` opens the briefing in
+a pane next to your chat, and the filtering and summaries run on your own Claude Code login. There
+is no separate model, provider or LLM key to set up.
+
 ## First run vs later
 
 On a channel's first sweep there is no history, so yt-briefing takes the latest video of each
@@ -28,11 +32,8 @@ the last one left off.
 
 ## Setup
 
-You'll need Node 18+ or Bun, a YouTube Data API v3 key, an LLM key (a
-[free Gemini key](https://aistudio.google.com/apikey) works, see [Providers](#providers)), and
-a tool that runs skills: [Claude Code](https://claude.com/claude-code),
-[Cursor](https://cursor.com), [Codex](https://developers.openai.com/codex), or anything else
-that loads the standard `SKILL.md` (Agent Skills — 30+ agents).
+You'll need Node 18+ or Bun, a YouTube Data API v3 key, and
+[Claude Code](https://claude.com/claude-code) installed and logged in, with `claude` on your PATH.
 
 1. Install yt-dlp (it pulls the subtitles):
 
@@ -53,18 +54,15 @@ yarn add yt-briefing
 bun  add yt-briefing
 ```
 
-3. Put your keys in a `.env` at your project root — all four are required:
+3. Put your YouTube key in a `.env` at your project root:
 
 ```ini
-YT_BRIEFING_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-YT_BRIEFING_LLM_API_KEY=<key>        # free at https://aistudio.google.com/apikey
-YT_BRIEFING_LLM_MODEL=gemini-2.5-flash
 YT_BRIEFING_YOUTUBE_API_KEY=<key>    # console.cloud.google.com → enable "YouTube Data API v3"
 ```
 
-Any OpenAI-compatible endpoint works — see [Providers](#providers) to use OpenRouter, OpenAI,
-Anthropic, or a local Ollama instead of Gemini. `YT_BRIEFING_PROXY` (datacenter/VPS IPs) is the
-only optional extra.
+Optional extras: `YT_BRIEFING_MODEL` picks the Claude model for filtering and summaries (default
+`haiku`, any alias or model name `claude --model` accepts), and `YT_BRIEFING_PROXY` routes
+transcript fetches through a proxy on datacenter/VPS IPs.
 
 4. Onboard:
 
@@ -72,7 +70,8 @@ only optional extra.
 npx yt-briefing init      # or: bunx yt-briefing init
 ```
 
-`init` asks for your language, the channels to follow, and which tool runs `/yt`.
+`init` asks for your language and the channels to follow, then installs `/yt` and the two
+skills into your project's `.claude/skills/`.
 
 Add or remove channels anytime:
 
@@ -118,84 +117,64 @@ it to go deeper, lower it for a quicker pass:
 /yt-search @betterstack which terminal --top 5
 ```
 
+## Run it
+
+Open your project in Claude Code and type `/yt`. The briefing opens in a pane: the summary, and
+under it four keys.
+
+| Key | What it does |
+|-----|--------------|
+| `1` OK | Neutral. The video is marked as seen, the next one loads. |
+| `2` Weak | Worthless. The title goes to the channel's skip examples, so the filter learns to drop titles like it. |
+| `3` Research | Ends the loop and hands this video to Claude, see below. |
+| `4` Stop | Closes the pane. The next `/yt` resumes where you stopped. |
+
+The **Comment** field takes anything else. Type what you think in your own words ("too many panel
+shows, skip those") and press Enter: Claude turns it into a standing rule for that channel and
+infers the rating. `? your question` starts research with that question, `stop` closes the pane.
+
+Each step is the engine, not a chat turn: rating a video costs no tokens of your session, and
+the next summary is usually ready before you have finished reading the current one.
+
+`/yt` is a Claude Code mod (a plugin in `.claude/skills/yt-briefing/`). Claude Code loads it on
+its own once you trust the project folder. If `/yt` is not listed, start a fresh session. To
+install again, after an upgrade or into another project, run `npx yt-briefing install-skill` (it
+installs `/yt`, `/yt-transcribe` and `/yt-search`).
+
 ## Don't shelve it — research it
 
 Tech channels announce something new every week, and the usual fate is "looks interesting" →
-to-do list → never. So the rating popup has a third option next to OK/Weak: **Research**. Pick
-it — or type `? your question` straight into the comment box — and the loop ends there: the
-agent pulls that video's full transcript and works your question with you. Against your own
-codebase if you ask "would this fit my project", against the web if the claims need checking —
-a quick feedback loop instead of a shelf. The video is marked as seen, and the next `/yt`
-resumes the queue right where you broke off.
+to-do list → never. So next to OK/Weak there is a third key: **Research**. Press it, or type
+`? your question` into the comment field, and the loop ends there: the pane closes and the video
+lands in your chat with its briefing and the command for its full transcript. Claude works your
+question with you, against your own codebase if you ask "would this fit my project", against the
+web if the claims need checking. A quick feedback loop instead of a shelf. The video is marked as
+seen, and the next `/yt` resumes the queue right where you broke off.
 
-## Run it
+## Upgrading from 0.x
 
-Open your project in Claude Code or Cursor and run `/yt`. If it's not listed, start a fresh
-session. To install the skills again for another tool or project, run
-`npx yt-briefing install-skill` (it installs `/yt`, `/yt-transcribe`, and `/yt-search`).
+1.0 runs on Claude Code only. The OpenAI-compatible provider and its three `YT_BRIEFING_LLM_*`
+keys are gone (delete them from `.env`), and the chat-driven `/yt` skill with its rating popup is
+replaced by the pane. Run `npx yt-briefing install-skill` once in your project: it installs the
+pane, and removes the old `/yt` skill and the summary-gate hook from `.claude/settings.json`. Your
+channels, profiles and ratings in `.yt-briefing/data/` carry over unchanged.
 
-## Rating gate
+## Why Claude Code, and nothing else
 
-The loop only works if you see the summary *before* you rate it, and that is the one step an
-agent can silently drop — the popup still appears, you still answer, and the rating is recorded
-against a summary nobody read. On Claude Code the installer wires a `PreToolUse` hook into your
-project's `.claude/settings.json` that refuses to *record* a rating unless the video's summary is
-in the chat. It merges with your existing hooks and updates itself on reinstall. If that file
-isn't valid JSON the installer leaves it alone and says so — add the entry yourself:
+Filtering and summaries are a `claude -p` call from the engine: one prompt in, one answer out, with
+no tools, no project settings or hooks, no MCP servers and no saved session. It runs on the login
+you already have, so there is no second model to pay for or keep a key to. If `ANTHROPIC_API_KEY`
+is set in your environment, the engine removes it for that call, because Claude Code would
+otherwise bill it as API usage instead of using your login.
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      { "matcher": "Bash",
-        "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PROJECT_DIR}/node_modules/yt-briefing/dist/yt-summary-gate.js\"" } ] }
-    ]
-  }
-}
-```
+The engine still works ahead in the background. It expands channels in parallel and summarizes the
+next video while you rate the current one, so each step is usually ready with no wait. The pane
+only shows what the engine produced and sends your key presses back to it.
 
-It watches the rating write rather than the popup, because the popup cannot be gated: the agent
-pastes the summary and opens the popup in one message, and the harness only writes a message to
-the transcript once that message is complete — so the evidence does not exist yet at popup time.
-The rating write is a separate call in the next message, where it does. The matcher is `Bash`, so
-the hook is invoked on ordinary shell commands too; it reads the command line and exits before
-touching anything. The tradeoff: a genuinely skipped paste is caught after you have answered, so
-that one answer is wasted — but nothing reaches the channel profile unseen.
-
-Other agents have no equivalent hook, so there the instruction in `SKILL.md` is what holds.
-
-## Providers
-
-Any OpenAI-compatible endpoint works. Gemini 2.5 Flash is the easy default. It's fast, cheap,
-and free to start at [Google AI Studio](https://aistudio.google.com/apikey):
-
-```ini
-YT_BRIEFING_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-YT_BRIEFING_LLM_API_KEY=<gemini-key>
-YT_BRIEFING_LLM_MODEL=gemini-2.5-flash
-```
-
-> On the free tier Gemini sometimes returns a "model is overloaded / high demand" error. Retry,
-> or switch to a paid key (enable billing, same model) to avoid it.
-
-Want something else? Change those three lines for OpenRouter (`https://openrouter.ai/api/v1`),
-OpenAI (`https://api.openai.com/v1`), Anthropic (`https://api.anthropic.com/v1/`,
-e.g. `claude-sonnet-5`), or a local Ollama (`http://localhost:11434/v1`). Set
-`YT_BRIEFING_LLM_BASE_URL`, `_API_KEY`, and `_MODEL` in your root `.env` (see [Setup](#setup)).
-
-## Why an API, not the agent's native model
-
-The filtering and the summaries go through a plain OpenAI-compatible API call from the engine,
-not through the coding agent's own model. Two reasons.
-
-Speed. The engine works ahead in the background. It expands channels in parallel and starts
-summarizing the next video while you rate the current one, so the following step is usually
-ready with no wait. An agent's turn-by-turn loop cannot prefetch like that, and every step pays
-its own cold start, which adds up across a whole queue.
-
-Compatibility. A standard API plus a standard `SKILL.md` means one engine runs everywhere: Claude
-Code, Cursor, Codex, any other Agent-Skills-compatible tool, or the plain CLI. A tool-native
-approach would tie it to that one tool and one model.
+Supporting every agent that reads `SKILL.md` meant a chat loop for the rating: the model pasted
+each summary, asked the question and recorded the answer, every video a full turn, plus a hook to
+make sure the summary was really shown. A Claude Code pane does the same with no model in the loop,
+which is why 1.0 drops the other agents.
 
 ## Why one transcript at a time
 
@@ -210,7 +189,8 @@ flowing.
 ## Sync across machines
 
 Your state is plain files in `.yt-briefing/data/`. Version that folder (or point `YT_BRIEFING_DATA_DIR`
-at a separate private repo) and commit after each rating. Recipe:
+at a separate private repo) and commit after each rating: set `"after_rate"` in
+`.yt-briefing/data/config.json` to a script and the engine runs it after every rating. Recipe:
 [docs/sync-across-machines.md](./docs/sync-across-machines.md).
 
 ## Running on a VPS

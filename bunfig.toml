@@ -20,3 +20,8 @@ minimumReleaseAgeExcludes = []
 # SecurityScannerNotInDependencies). Note: it hits the network on every install.
 [install.security]
 scanner = "@socketsecurity/bun-security-scanner"
+
+# `bun test` covers the package's own tests only. The Claude Code mod in plugin/ has its own
+# tests, run by `claude plugin test plugin` against the engine's test kit.
+[test]
+root = "tests"
