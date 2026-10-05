@@ -1,27 +1,29 @@
 /**
- * User preferences for yt-briefing — currently just the output language, decided at
- * onboarding and stored in DATA_DIR/config.json. Kept separate from .env on purpose:
+ * User preferences for yt-briefing — the output language (decided at onboarding) and an optional
+ * after-rate command, stored in DATA_DIR/config.json. Kept separate from .env on purpose:
  * .env holds secrets (API keys, proxy), config.json holds non-secret preferences that
- * both the engine and the agent (skill) read. The skill reads `output_lang` to ask the
- * rating question in the user's language; the engine reads it to write summaries in it.
+ * the engine reads. `output_lang` is the language summaries are written in; `after_rate` is a shell
+ * command run (detached, from the project root) after every recorded rating, e.g. a script that
+ * commits DATA_DIR to git. The engine itself never runs VCS; the command is yours.
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { CONFIG_JSON } from './paths.ts';
 
 export interface Config {
   output_lang: string;   // natural-language name, e.g. "English", "Polish", "Spanish"
+  after_rate?: string;   // shell command run after each rating (optional)
 }
 
 export function loadConfig(): Config {
+  let c: Record<string, unknown> = {};
   if (existsSync(CONFIG_JSON)) {
-    try {
-      const c = JSON.parse(readFileSync(CONFIG_JSON, 'utf8'));
-      if (typeof c.output_lang === 'string' && c.output_lang.trim()) {
-        return { output_lang: c.output_lang.trim() };
-      }
-    } catch { /* malformed → fall through to env/default */ }
+    try { c = JSON.parse(readFileSync(CONFIG_JSON, 'utf8')); } catch { /* malformed → defaults */ }
   }
-  return { output_lang: process.env.OUTPUT_LANG?.trim() || 'English' };
+  const lang = typeof c.output_lang === 'string' && c.output_lang.trim()
+    ? c.output_lang.trim()
+    : process.env.OUTPUT_LANG?.trim() || 'English';
+  const afterRate = typeof c.after_rate === 'string' && c.after_rate.trim() ? c.after_rate.trim() : undefined;
+  return { output_lang: lang, ...(afterRate ? { after_rate: afterRate } : {}) };
 }
 
 /** The language summaries and ratings are written in. Default English. */

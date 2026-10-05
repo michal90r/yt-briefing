@@ -1,69 +1,35 @@
 #!/usr/bin/env node
 /**
- * install-skill — copy this package's skills (`/yt` + `/yt-transcribe`) into a coding agent's
- * skills directory so the agent detects them. For any target that isn't this package under Bun,
- * each command is baked to `"<this runtime>" "<abs>/dist/X.js"` (the compiled build), so it works
- * no matter the agent's working directory or runtime (the engine resolves data/.env from its own
- * location).
+ * install-skill — install yt-briefing into a Claude Code project: the `/yt` mod (the rating pane)
+ * plus the `/yt-transcribe` and `/yt-search` skills, all under `<project>/.claude/skills/`.
  *
- *   yt-briefing install-skill        # interactive: pick agent + scope
+ *   yt-briefing install-skill        # interactive: which project folder
  *
- * `bun run init` already installs these skills into the project as its final step; this
- * standalone command is for re-installing, a different project, or a second agent. There is
- * deliberately no home-global install — the skills live with the project that uses them.
- *
- * SKILL.md is the cross-agent Agent Skills standard, so the shipped skills run in any compatible
- * agent (Claude Code, Cursor, Codex, and 30+ others); this command just (re)places them in the
- * skills dir of whichever agent you pick.
+ * `init` already does this as its final step; this standalone command is for re-installing
+ * (e.g. after an upgrade), or for another project. There is deliberately no home-global install —
+ * everything lives with the project that uses it. Upgrading from 0.x also removes the old
+ * chat-driven `/yt` skill and the summary-gate hook it needed.
  */
 
-import { AGENTS, installSkills, projectSkillsRoot, customSkillsRootDefault, isPackageDevCwd, installClaudeGate, CLAUDE_CODE } from './lib/skill-install.ts';
+import { installAll, isPackageDevCwd } from './lib/skill-install.ts';
 import { question } from './lib/prompt.ts';
 
 const ask = (q: string, def = ''): string => question(def ? `${q} [${def}]:` : `${q}:`).trim() || def;
 
-function done(targets: string[], gate?: string | null): void {
-  console.log('\n  ✓ Installed:');
-  for (const t of targets) console.log(`      ${t}`);
-  if (gate) console.log(`      ${gate}  (summary gate)`);
-  if (gate === null) console.log(`  ! .claude/settings.json isn't valid JSON — add the summary gate by hand (README → Rating gate).`);
-  console.log('  Start a fresh agent session, then run  /yt  or  /yt-transcribe\n');
-}
-
-/** Claude Code only: the PreToolUse hook that blocks a rating popup with no summary in the chat. */
-const gateFor = (key: string, projectDir: string, dist: boolean): string | null | undefined =>
-  key === CLAUDE_CODE ? installClaudeGate(projectDir, dist) : undefined;
-
-// 1) which agent → which skills subdir
-console.log('\n  Install the /yt + /yt-transcribe skills — which agent?\n');
-console.log('    1) Claude Code');
-console.log('    2) Cursor');
-console.log('    3) Codex');
-console.log('    4) Custom folder (any other compatible agent)\n');
-
-const agentKey = ask('  Agent', '1');
-const agent = AGENTS[agentKey];
-
-// 3) Custom — write the skills straight into a skills root the user names (their agent's dir).
-// Arbitrary location → bake the absolute dist commands so they work whatever the agent's cwd is.
-if (!agent) {
-  done(installSkills(ask('  Skills folder to install into', customSkillsRootDefault()), true));
-  process.exit(0);
-}
-
-// 2) Known agent → which project (default: the current folder). No home-global option by
-// design — the skills are always scoped to a project that uses them.
-console.log(`\n  ${agent.name} — which project?\n`);
+console.log('\n  Install /yt (pane) + /yt-transcribe + /yt-search into a Claude Code project.\n');
 console.log('    1) This project (current folder) — recommended');
 console.log('    2) Another project folder\n');
 
-if (ask('  Where', '1') === '2') {
-  // A different project → the agent's cwd won't be the package, so bake the absolute dist commands.
-  const projectDir = ask('  Project folder', process.cwd());
-  done(installSkills(projectSkillsRoot(agentKey, projectDir), true), gateFor(agentKey, projectDir, true));
-} else {
-  // Current folder: shipped `bun run src` only when developing in the package clone under Bun;
-  // otherwise (incl. consuming the package as a dependency) bake the compiled dist commands.
-  const dist = !isPackageDevCwd();
-  done(installSkills(projectSkillsRoot(agentKey, process.cwd()), dist), gateFor(agentKey, process.cwd(), dist));
+const other = ask('  Where', '1') === '2';
+const projectDir = other ? ask('  Project folder', process.cwd()) : process.cwd();
+// The shipped dev commands only work developing inside the package clone under Bun; anything
+// else (another folder, Node, the package consumed as a dependency) gets the compiled dist/ form.
+const { written, removed } = installAll(projectDir, other || !isPackageDevCwd());
+
+console.log('\n  Installed:');
+for (const t of written) console.log(`      ${t}`);
+if (removed.length) {
+  console.log('  Removed (replaced in 1.0):');
+  for (const r of removed) console.log(`      ${r}`);
 }
+console.log('\n  Start a fresh Claude Code session in that project (trust the folder when asked), then run  /yt\n');

@@ -12,7 +12,7 @@
  *   bun src/yt-sweep.ts --fill                 (internal: detached queue builder)
  *
  * Output (stdout, single JSON line):
- *   {"status":"rating_needed","summary":"<md>","pending":{channel,videoId,title,type,publishedAt,is_baseline}}
+ *   {"status":"rating_needed","summary":"<md>","pending":{channel,videoId,title,type,publishedAt,is_baseline}}  (+ "lang")
  *   {"status":"done"}
  *   {"status":"rate_limited"}
  *
@@ -50,9 +50,9 @@
 
 import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, renameSync, appendFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { loadEnv, missingEnv, missingEnvMessage, REQUIRED_LLM, REQUIRED_YOUTUBE } from './lib/env.ts';
+import { loadEnv, missingEnv, missingEnvMessage, REQUIRED_YOUTUBE } from './lib/env.ts';
 import { parseChannels, parseState, bumpStatePointer, isResolved } from './lib/yt-lib.ts';
-import { chat, getModel } from './lib/llm.ts';
+import { chat, claudeMissing } from './lib/llm.ts';
 import { outputLang } from './lib/config.ts';
 import {
   PKG_ROOT, CHANNELS_MD, STATE_MD, CACHE_DIR,
@@ -288,8 +288,6 @@ Output ONLY a raw JSON array (no markdown fences, no explanation):
   try {
     out = await chat(prompt, {
       system: "You are a video title classifier. Output ONLY a raw JSON array as instructed. No markdown fences, no explanation.",
-      model: getModel(),
-      temperature: 0,
     });
   } catch { return skip; }
 
@@ -337,7 +335,6 @@ Steps:
 
   return await chat(prompt, {
     system: `You write channel briefings in ${LANG}, following the task instructions and the channel's standing directives exactly. Output only the briefing or 'OFFTOPIC: <reason>' — no preamble, no meta-commentary about the instructions.`,
-    model: getModel(),
   });
 }
 
@@ -527,7 +524,7 @@ async function advance(queue: Queue): Promise<never> {
     writeFileSync(QUEUE_FILE, JSON.stringify(queue));
     // Warm the NEXT video in the background while the user rates this one.
     spawnPrefetch(queue.items[1]);
-    emit({ status: 'rating_needed', summary: result.summary, pending });
+    emit({ status: 'rating_needed', summary: result.summary, pending, lang: LANG });
   }
 
   // All processed.
@@ -599,11 +596,13 @@ if (reset) {
 }
 // Fatal config preflight, foreground only (the detached --fill / --prefetch children already
 // exited above). A missing key would otherwise surface as a misleading `status:"done"` ("no new
-// videos") — the YouTube error is collapsed by the per-channel catch, and a missing LLM key is
-// swallowed by the title-filter's keep-all fallback. Fail fast naming every missing var instead.
+// videos") — the YouTube error is collapsed by the per-channel catch, and a missing `claude` CLI is
+// swallowed by the title-filter's keep-all fallback. Fail fast naming what is missing instead.
 {
-  const missing = missingEnv([...REQUIRED_LLM, ...REQUIRED_YOUTUBE]);
+  const missing = missingEnv(REQUIRED_YOUTUBE);
   if (missing.length) emit({ status: 'error', error: missingEnvMessage(missing) });
+  const noClaude = claudeMissing();
+  if (noClaude) emit({ status: 'error', error: noClaude });
 }
 const queue = loadQueue() ?? buildQueue();
 await advance(queue);

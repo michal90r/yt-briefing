@@ -8,10 +8,10 @@
  *   1. Output language for summaries + ratings   → DATA_DIR/config.json
  *   2. The channels you follow — just a flat list of handles
  *      → DATA_DIR/channels.md, DATA_DIR/state.md, DATA_DIR/channels/<slug>.md
- *   3. Which agent runs /yt — installs the skill into its skills dir
+ *   3. Installs /yt (the rating pane) + /yt-transcribe + /yt-search into this Claude Code project
  *
- * It does NOT touch keys: those live in your project root .env (see README → Setup); the engine
- * reads them at run time. Re-running is safe: it warns before overwriting existing data and bails.
+ * It does NOT touch keys: the one key (YouTube Data API) lives in your project root .env (see README →
+ * Setup); the engine reads it at run time. Filters and summaries run on your Claude Code login. Re-running is safe: it warns before overwriting existing data and bails.
  * Everything it writes is plain Markdown / JSON you can also edit by hand afterwards.
  */
 
@@ -20,8 +20,9 @@ import { join } from 'node:path';
 import {
   DATA_DIR, BASE_DIR, PKG_ROOT, CHANNELS_DIR, CHANNELS_MD, STATE_MD, CONFIG_JSON, profilePath, ROOT_ENV_PATH,
 } from './lib/paths.ts';
-import { loadEnv, missingEnv, REQUIRED_LLM, REQUIRED_YOUTUBE } from './lib/env.ts';
-import { AGENTS, installSkills, projectSkillsRoot, customSkillsRootDefault, isPackageDevCwd, installClaudeGate, CLAUDE_CODE } from './lib/skill-install.ts';
+import { loadEnv, missingEnv, REQUIRED_YOUTUBE } from './lib/env.ts';
+import { installAll, isPackageDevCwd } from './lib/skill-install.ts';
+import { claudeMissing } from './lib/llm.ts';
 import { question } from './lib/prompt.ts';
 import { normalizeHandle, slugify, serializeChannels, serializeState, profileBody, baselineStateRow } from './lib/channels.ts';
 
@@ -48,8 +49,8 @@ function main(): void {
     console.log('');
   }
 
-  // Keys are NOT asked here — they live in your project root .env (LLM + YouTube; see README
-  // → Setup). The engine reads them at run time and fails fast naming any that are missing.
+  // Keys are NOT asked here — the YouTube key lives in your project root .env (see README →
+  // Setup). The engine reads it at run time and fails fast naming it if missing.
 
   // 1. Language ----------------------------------------------------------------
   console.log('  1) Language');
@@ -87,19 +88,7 @@ function main(): void {
     console.log('\n  No channels added — you can add them later by editing data/channels.md.\n');
   }
 
-  // 3. Coding agent ------------------------------------------------------------
-  // Place the skill INTO THIS PROJECT (the package folder you open in the agent) — never a
-  // home-global dir (that's the npm -g antipattern: machine-wide, invisible, easy to forget).
-  // SKILL.md is the cross-agent standard, so the shipped skill runs in any compatible agent —
-  // we just install it into that agent's skills dir (.claude/skills, .cursor/skills, .codex/skills).
-  // 1/2/3 = known agents; 4 = any other compatible agent (a project folder you name).
-  console.log('\n  3) Which agent will you run /yt in?  (it ships a standard Agent Skill — any compatible agent works)');
-  console.log('       1) Claude Code   2) Cursor   3) Codex   4) Custom folder (any other agent)\n');
-  const agentKey = ask('  Your agent', '1');
-  // For a custom target, ask the folder now (keeps all prompts in the interactive block).
-  const customDir = AGENTS[agentKey] ? '' : ask('  Skills folder to install into', customSkillsRootDefault());
-
-  // 4. Write everything --------------------------------------------------------
+  // 3. Write everything --------------------------------------------------------
   mkdirSync(CHANNELS_DIR, { recursive: true });
 
   // Keep the throwaway cache out of git for the consume layout. data/ stays versionable (for sync).
@@ -123,45 +112,32 @@ function main(): void {
   console.log(`    ${STATE_MD}`);
   console.log(`    ${channels.length} profile(s) in ${CHANNELS_DIR}/`);
 
-  // Install the /yt + /yt-transcribe skills for the chosen agent (step 6), into THIS project —
-  // process.cwd(), i.e. wherever you ran the command (the package clone in dev, or your own
-  // project when the package is a dependency). The command baked in is the shipped `bun run src`
-  // only for the dev-in-clone case; otherwise the compiled `dist/` command (so a consumed package works).
-  const agent = AGENTS[agentKey];
+  // Install into THIS project — process.cwd(), wherever you ran the command (the package clone in
+  // dev, or your own project when the package is a dependency). The shipped dev commands only for
+  // the dev-in-clone case; otherwise the compiled `dist/` commands (so a consumed package works).
   try {
-    const targets = agent
-      ? installSkills(projectSkillsRoot(agentKey, process.cwd()), /* dist */ !isPackageDevCwd())
-      : installSkills(customDir, /* dist */ true);
-    for (const t of targets) console.log(`    skill → ${t}`);
-    // Claude Code also gets the summary gate — the hook that refuses a rating popup for a video
-    // whose summary was never pasted into the chat. No other agent exposes PreToolUse.
-    if (agentKey === CLAUDE_CODE) {
-      const gate = installClaudeGate(process.cwd(), /* dist */ !isPackageDevCwd());
-      console.log(
-        gate
-          ? `    gate  → ${gate}`
-          : `  ! .claude/settings.json isn't valid JSON — add the summary gate by hand (README → Rating gate).`,
-      );
-    }
+    const { written, removed } = installAll(process.cwd(), /* dist */ !isPackageDevCwd());
+    for (const t of written) console.log(`    claude → ${t}`);
+    for (const r of removed) console.log(`    removed (replaced in 1.0) → ${r}`);
   } catch (e) {
-    console.log(`  ! Couldn't install the skills (${(e as Error).message}) — run  yt-briefing install-skill  later.`);
+    console.log(`  ! Couldn't install into .claude/skills (${(e as Error).message}) — run  yt-briefing install-skill  later.`);
   }
 
-  // Preflight the keys the engine needs at run time. init deliberately does NOT write them —
-  // they live in the project root .env (12-factor) — but warn now, naming any still missing, so
-  // the gap surfaces here instead of at the first /yt.
+  // Preflight what the engine needs at run time, so the gap surfaces here instead of at the
+  // first /yt: the YouTube key in the project root .env, and a logged-in `claude` CLI.
   loadEnv();
-  const missingKeys = missingEnv([...REQUIRED_LLM, ...REQUIRED_YOUTUBE]);
+  const missingKeys = missingEnv(REQUIRED_YOUTUBE);
   if (missingKeys.length) {
-    console.log('\n  ⚠ Keys still needed before /yt will run — add them to your project root .env:');
+    console.log('\n  ⚠ Key still needed before /yt will run — add it to your project root .env:');
     for (const k of missingKeys) console.log(`      ${k}`);
-    console.log(`    Path: ${ROOT_ENV_PATH}   ·   full block in README → Setup`);
+    console.log(`    Path: ${ROOT_ENV_PATH}   ·   see README → Setup`);
   }
+  const noClaude = claudeMissing();
+  if (noClaude) console.log(`\n  ⚠ ${noClaude}`);
 
   console.log('\n  Next:');
-  console.log(`    1. Open this folder in ${agent ? agent.name : 'your agent'}.`);
-  console.log('    2. Start a new chat and type  /yt  (or  /yt-transcribe <url>)');
-  console.log('\n  No agent? Run it in the terminal instead — see the README.\n');
+  console.log('    1. Open this folder in Claude Code (trust it when asked).');
+  console.log('    2. Type  /yt  — the briefing opens in a pane.  (/yt-transcribe <url> for one video)\n');
 }
 
 try { main(); } catch (err) { console.error(err); process.exit(1); }

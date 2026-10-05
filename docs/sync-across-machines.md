@@ -89,31 +89,24 @@ echo "yt-briefing: state NOT pushed — resolve: cd \"$DATA\" && git pull --reba
 exit 0
 ```
 
-Then trigger it after each rating. Two ways, depending on how you run yt-briefing:
-
-**A) Via a coding agent (Claude Code / Cursor)** — add a `PostToolUse` hook that fires after
-the engine runs. In Claude Code's `settings.json`:
+Then point the engine at it. In `.yt-briefing/data/config.json` (the file is in the folder you
+version, so every machine gets the setting):
 
 ```json
 {
-  "hooks": {
-    "PostToolUse": [
-      { "matcher": "Bash",
-        "hooks": [ { "type": "command", "command": "cmd=$(jq -r '.tool_input.command // \"\"'); case \"$cmd\" in *yt-rating*|*yt-sweep*) /path/to/yt-sync.sh ;; esac" } ] }
-    ]
-  }
+  "output_lang": "English",
+  "after_rate": "/path/to/yt-sync.sh"
 }
 ```
 
-**B) Via the CLI** — just call it after `rate`:
-
-```bash
-yt-briefing rate --rating 0 && /path/to/yt-sync.sh
-```
+The engine runs `after_rate` after every recorded rating, from the pane and from the CLI
+(`yt-briefing rate`) alike. It runs detached from the project root, so a slow push never holds the
+next video, and a failing script never fails the rating (the rating is already on disk). The
+engine itself still never runs git: the command is yours.
 
 > Optional but recommended: also `git pull --rebase` **before** the first sweep of a session
-> (so a machine starts on the latest cursor), e.g. a `PreToolUse` hook matching
-> `*yt-sweep*--reset*`, or just `cd "$YT_BRIEFING_DATA_DIR" && git pull --rebase` before you start.
+> (so a machine starts on the latest cursor), e.g. `cd "$YT_BRIEFING_DATA_DIR" && git pull --rebase`
+> before you open `/yt`, or a `SessionStart` hook that does the same.
 
 ---
 
