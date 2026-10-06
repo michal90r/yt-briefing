@@ -163,6 +163,7 @@ function plain(md: string): string {
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/^_(.+)_$/gm, '$1')
     .replace(/^(\d+\.)\s+/gm, '$1 ')
+    .replace(/(\d{4}-\d{2}-\d{2})T[\d:.]+Z/g, '$1')
 }
 
 /** True when the person typed /yt through Remote Control and nothing attached can show a pane. */
@@ -171,22 +172,14 @@ async function paneUnseen($: EngineInterface, origin: { kind: string } | undefin
   return !(await $.session.surfaces()).some(s => s !== 'terminal')
 }
 
-/** The rating loop in the engine's question dialog, for a session where no pane can be seen. */
-async function dialogLoop($: EngineInterface) {
-  let reset = true
+/** The rating loop in the engine's question dialog, from a sweep already run, for a session where no pane can be seen. */
+async function dialogLoop($: EngineInterface, first: SweepOut) {
+  let out = first
   for (;;) {
-    let out: SweepOut
-    try {
-      out = await runSweep($, reset)
-    } catch (err) {
-      return void $.ui.toast(`The engine did not answer: ${String(err)}`)
-    }
-    reset = false
-    if (out.status !== 'rating_needed' || !out.summary || !out.pending) return void $.ui.toast(endText(out))
+    if (out.status !== 'rating_needed' || !out.summary || !out.pending) return void $.ui.log(endText(out))
 
-    const skipped = skipLine(out)
-    const question = [skipped, plain(out.summary), '', 'OK = neutral · Weak = skip titles like this · Research = dig in with Claude · Other = a rule for this channel (?question = research). Rating?']
-      .filter(line => line !== undefined).join('\n')
+    const filtered = out.skipped ? `(${out.skipped} filtered out)` : undefined
+    const question = [plain(out.summary), filtered, '', 'Rating?'].filter(line => line !== undefined).join('\n')
     let answer: string
     try {
       answer = (await $.ui.ask(question, { header: 'yt-briefing', options: CHOICES })).trim()
@@ -203,7 +196,12 @@ async function dialogLoop($: EngineInterface) {
     const args = answer === 'OK' ? ['--rating', '1'] : answer === 'Weak' ? ['--rating', '0'] : ['--raw-comment', answer]
     const saved = await record($, args)
     if (!saved) return
-    if (saved.rule) $.ui.toast(`Rule saved: ${saved.rule}`)
+    $.ui.log(saved.rule ? `Rule saved: ${saved.rule}. Looking for the next video…` : 'Saved. Looking for the next video…')
+    try {
+      out = await runSweep($, false)
+    } catch (err) {
+      return void $.ui.log(`The engine did not answer: ${String(err)}`)
+    }
   }
 }
 
@@ -226,9 +224,18 @@ export const register: Register = on => {
       }
       await $.ui.close({ id: PANE })
     }
-    void dialogLoop($)
+    // No pane to show progress in: the command itself runs while the first sweep does, so the
+    // session shows it working, and only then hands over to the dialogs.
+    let first: SweepOut
+    try {
+      first = await runSweep($, true)
+    } catch (err) {
+      return { text: `The engine did not answer: ${String(err)}` }
+    }
+    if (first.status !== 'rating_needed') return { text: endText(first) }
+    void dialogLoop($, first)
 
-    return { text: 'No pane here: the briefing runs in question dialogs.' }
+    return { text: 'Briefing ready: rate it in the question dialog.' }
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {

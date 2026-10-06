@@ -20,6 +20,7 @@ function host(on: On, log: { submitted: string[]; toasts: string[]; closed: numb
   on('ui.open', async () => ({ value: placed ? { isPlaced: true as const } : { isPlaced: false as const, reason: 'no surface places panes' } }))
   on('ui.close', async () => { log.closed += 1; return { value: undefined } })
   on('ui.toast', async (_$, e) => { log.toasts.push(e.text); return { value: undefined } })
+  on('ui.log', async (_$, e) => { log.toasts.push(e.text); return { value: undefined } })
   on('prompt.submit', async (_$, e) => { log.submitted.push(e.text); return { text: e.text } })
 }
 /** A finished engine subprocess, as `$.process.run` resolves it. */
@@ -165,7 +166,7 @@ test('where no pane is placed, /yt rates in question dialogs with plain-text bri
   })
 
   const out = await $.command.run(YT)
-  expect(out.text).toContain('question dialogs')
+  expect(out.text).toContain('question dialog')
   for (let i = 0; i < 50 && !log.toasts.join().includes("nothing left"); i++) await new Promise(r => setTimeout(r, 10))
 
   expect(log.closed).toBe(1)
@@ -173,6 +174,8 @@ test('where no pane is placed, /yt rates in question dialogs with plain-text bri
   expect(asked[0]).toContain('Point. Something said.')
   expect(asked[0]).not.toContain('**')
   expect(asked[0]).not.toContain('###')
+  expect(asked[0]).toContain('(1 filtered out)')
+  expect(asked[0]).not.toContain('A short')
   const ratings = calls.filter(c => c.some(a => a.includes('yt-rating')))
   expect(ratings[0]).toEqual(expect.arrayContaining(['--rating', '1']))
   expect(ratings[1]).toEqual(expect.arrayContaining(['--raw-comment', 'too many panels']))
