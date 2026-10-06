@@ -16,8 +16,8 @@ const VIDEO = {
 const PANE_PROPS = { title: 'yt-briefing', isFocused: true, bodyColumns: 100, placement: 'inline' }
 
 /** What the engine itself answers beneath the plugin: the pane, toasts, the session's prompt. */
-function host(on: On, log: { submitted: string[]; toasts: string[]; closed: number }) {
-  on('ui.open', async () => ({ value: { isPlaced: true as const } }))
+function host(on: On, log: { submitted: string[]; toasts: string[]; closed: number }, placed = true) {
+  on('ui.open', async () => ({ value: placed ? { isPlaced: true as const } : { isPlaced: false as const, reason: 'no surface places panes' } }))
   on('ui.close', async () => { log.closed += 1; return { value: undefined } })
   on('ui.toast', async (_$, e) => { log.toasts.push(e.text); return { value: undefined } })
   on('prompt.submit', async (_$, e) => { log.submitted.push(e.text); return { text: e.text } })
@@ -140,4 +140,42 @@ test('engine errors are shown, not swallowed', async ($, on) => {
   })
 
   expect((await ui.find({ text: 'Claude Code CLI not found' }))?.text).toBeDefined()
+})
+
+test('where no pane is placed, /yt rates in question dialogs with plain-text briefings', async ($, on) => {
+  const calls: string[][] = []
+  const asked: string[] = []
+  const log = newLog()
+  host(on, log, false)
+  let sweeps = 0
+  on('process.run', async (_$, e) => {
+    calls.push([...e.argv])
+    if (e.argv.some(a => a.includes('yt-sweep'))) {
+      sweeps += 1
+      return ran(JSON.stringify(sweeps < 3 ? VIDEO : { status: 'done' }))
+    }
+    return ran('{"ok":true,"rule":"Skip panels."}')
+  })
+  const answers = ['OK', 'too many panels']
+  on('tool.call', { tool: 'AskUserQuestion' }, async (_$, e) => {
+    const { questions } = e as unknown as { questions: { question: string }[] }
+    const q = questions[0].question
+    asked.push(q)
+    return { result: { questions, answers: { [q]: answers.shift() ?? 'Stop' } } } as never
+  })
+
+  const out = await $.command.run(YT)
+  expect(out.text).toContain('question dialogs')
+  for (let i = 0; i < 50 && !log.toasts.join().includes("nothing left"); i++) await new Promise(r => setTimeout(r, 10))
+
+  expect(log.closed).toBe(1)
+  expect(asked).toHaveLength(2)
+  expect(asked[0]).toContain('Point. Something said.')
+  expect(asked[0]).not.toContain('**')
+  expect(asked[0]).not.toContain('###')
+  const ratings = calls.filter(c => c.some(a => a.includes('yt-rating')))
+  expect(ratings[0]).toEqual(expect.arrayContaining(['--rating', '1']))
+  expect(ratings[1]).toEqual(expect.arrayContaining(['--raw-comment', 'too many panels']))
+  expect(log.toasts.join()).toContain('Skip panels.')
+  expect(log.toasts.join()).toContain('nothing left to rate')
 })

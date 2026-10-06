@@ -5,6 +5,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-10-06
+
+### Added
+- **`/yt` works where no pane can be seen.** Sent from claude.ai/code over Remote Control (or on a
+  surface that places no panes), it used to open a pane only the server's terminal could see. Now
+  the same loop runs in Claude Code's own question dialog: the summary as plain text with the
+  Markdown marks stripped, OK / Weak / Research / Stop as choices, and a typed answer under
+  **Other** treated as the Comment field (`?question` starts research, `stop` ends). No model is
+  in the loop, so nothing is copied into the chat.
+
 ## [1.1.1] - 2026-10-06
 
 ### Fixed

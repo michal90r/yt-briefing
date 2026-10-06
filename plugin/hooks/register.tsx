@@ -7,6 +7,8 @@ import { engine } from './engine.ts'
 // The /yt rating loop as a pane. Every step runs the engine as a subprocess and reads its one-line
 // JSON; the model is not involved unless the person asks for research, which hands the video to
 // the session as a prompt. Ratings and comments are written by the engine, never by this module.
+// Where no pane can be seen (a Remote Control web client, a surface that places none) the same
+// loop runs in the engine's own question dialog instead.
 
 const PANE = 'yt-briefing'
 const view = atom({ plugin: 'yt-briefing', key: 'view' } as const, { phase: 'idle' } as View)
@@ -50,13 +52,25 @@ function skipLine(out: SweepOut): string | undefined {
   return `Skipped ${out.skipped}: ${list}`
 }
 
+/** One engine sweep: the next ratable video, or the end state. Throws when the engine does not answer. */
+async function runSweep($: EngineInterface, reset: boolean): Promise<SweepOut> {
+  const run = await $.process.run([...engine('yt-sweep'), ...(reset ? ['--reset'] : [])], { timeoutMs: SWEEP_MS })
+  return parseOut(run.stdout)
+}
+
+/** What a sweep that found nothing to rate says, skips included. */
+function endText(out: SweepOut): string {
+  const text = out.status === 'done' ? STATUS_TEXT.done : out.error ?? STATUS_TEXT[out.status] ?? `Engine status: ${out.status}`
+  const skipped = skipLine(out)
+  return skipped ? `${text}\n${skipped}` : text
+}
+
 /** Advance to the next ratable video and put it (or the end state) in the view. */
 async function sweep($: EngineInterface, reset: boolean) {
   await setView($, { phase: 'loading' })
   let out: SweepOut
   try {
-    const run = await $.process.run([...engine('yt-sweep'), ...(reset ? ['--reset'] : [])], { timeoutMs: SWEEP_MS })
-    out = parseOut(run.stdout)
+    out = await runSweep($, reset)
   } catch (err) {
     await setView($, { phase: 'error', message: `The engine did not answer: ${String(err)}` })
     return
@@ -76,17 +90,26 @@ async function rate($: EngineInterface, args: string[], thenNext = true): Promis
   const v = await read($, view)
   if (v.phase !== 'rating' || v.busy) return null
   await update($, view, cur => ({ ...cur, busy: args[0] === '--raw-comment' ? 'Turning the comment into a rule…' : 'Saving…' }))
+  const result = await record($, args)
+  if (!result) {
+    await update($, view, cur => ({ ...cur, busy: undefined }))
+    return null
+  }
+  if (thenNext) void sweep($, false)
+  return result
+}
+
+/** Run the rating engine; on failure toast why and resolve null. */
+async function record($: EngineInterface, args: string[]): Promise<{ rule?: string } | null> {
   const run = await $.process.run([...engine('yt-rating'), ...args], { timeoutMs: RATE_MS }).catch(err => ({
     exitCode: 1, stdout: '', stderr: String(err),
   }))
   if (run.exitCode !== 0) {
-    await update($, view, cur => ({ ...cur, busy: undefined }))
     $.ui.toast(`Rating not saved: ${run.stderr.trim().slice(0, 200) || 'engine error'}`)
     return null
   }
   let result: { rule?: string } = {}
   try { result = JSON.parse(run.stdout.trim().split('\n').pop() ?? '{}') } catch { /* rating is on disk */ }
-  if (thenNext) void sweep($, false)
   return result
 }
 
@@ -96,7 +119,11 @@ async function research($: EngineInterface, question?: string) {
   if (!v.pending || !v.summary) return
   if (!(await rate($, ['--rating', '1'], false))) return
   await $.ui.close({ id: PANE })
-  const p = v.pending
+  await handOff($, v.pending, v.summary, v.lang, question)
+}
+
+/** Give the video to the session as the person's prompt, to research it together. */
+async function handOff($: EngineInterface, p: Pending, summary: string, lang: string | undefined, question?: string) {
   const transcript = [...engine('yt-transcript'), p.videoId, '--lang', 'auto'].join(' ')
   const ask = question
     ? `My question: ${question}`
@@ -107,9 +134,9 @@ async function research($: EngineInterface, question?: string) {
       `Let's research this video together: ${p.channel} — "${p.title}" (${p.videoId}, ${p.type}).`,
       '',
       'Its briefing:',
-      v.summary,
+      summary,
       '',
-      `For anything beyond the briefing, pull the full transcript with \`${transcript}\` and work from the tool result; never paste the transcript into the chat, quote only short passages. Keep what the video claims separate from what you verify yourself, and use whatever the question needs (my project, the web). Answer in ${v.lang ?? 'English'}.`,
+      `For anything beyond the briefing, pull the full transcript with \`${transcript}\` and work from the tool result; never paste the transcript into the chat, quote only short passages. Keep what the video claims separate from what you verify yourself, and use whatever the question needs (my project, the web). Answer in ${lang ?? 'English'}.`,
       ask,
       '',
       'If it turns out to be hype, record it with `' + [...engine('yt-rating'), '--rating', '0'].join(' ') + '`; a lasting preference about this channel goes in with `' + [...engine('yt-rating'), '--raw-comment', '"<what to remember>"'].join(' ') + '`.',
@@ -126,6 +153,59 @@ async function comment($: EngineInterface, raw: string) {
   if (saved?.rule) $.ui.toast(`Rule saved: ${saved.rule}`)
 }
 
+/** The dialog's choices; anything else is text typed under "Other". */
+const CHOICES = ['OK', 'Weak', 'Research', 'Stop'] as const
+
+/** The dialog draws plain text: drop the briefing's Markdown marks so no `**` or `###` shows. */
+function plain(md: string): string {
+  return md
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/^_(.+)_$/gm, '$1')
+    .replace(/^(\d+\.)\s+/gm, '$1 ')
+}
+
+/** True when the person typed /yt through Remote Control and nothing attached can show a pane. */
+async function paneUnseen($: EngineInterface, origin: { kind: string } | undefined): Promise<boolean> {
+  if (origin?.kind !== 'bridge') return false
+  return !(await $.session.surfaces()).some(s => s !== 'terminal')
+}
+
+/** The rating loop in the engine's question dialog, for a session where no pane can be seen. */
+async function dialogLoop($: EngineInterface) {
+  let reset = true
+  for (;;) {
+    let out: SweepOut
+    try {
+      out = await runSweep($, reset)
+    } catch (err) {
+      return void $.ui.toast(`The engine did not answer: ${String(err)}`)
+    }
+    reset = false
+    if (out.status !== 'rating_needed' || !out.summary || !out.pending) return void $.ui.toast(endText(out))
+
+    const skipped = skipLine(out)
+    const question = [skipped, plain(out.summary), '', 'OK = neutral · Weak = skip titles like this · Research = dig in with Claude · Other = a rule for this channel (?question = research). Rating?']
+      .filter(line => line !== undefined).join('\n')
+    let answer: string
+    try {
+      answer = (await $.ui.ask(question, { header: 'yt-briefing', options: CHOICES })).trim()
+    } catch {
+      return
+    }
+
+    if (answer === 'Stop' || answer.toLowerCase() === 'stop' || !answer) return
+    if (answer === 'Research' || answer.startsWith('?')) {
+      if (!(await record($, ['--rating', '1']))) return
+      const q = answer.startsWith('?') ? answer.slice(1).trim() || undefined : undefined
+      return handOff($, out.pending, out.summary, out.lang, q)
+    }
+    const args = answer === 'OK' ? ['--rating', '1'] : answer === 'Weak' ? ['--rating', '0'] : ['--raw-comment', answer]
+    const saved = await record($, args)
+    if (!saved) return
+    if (saved.rule) $.ui.toast(`Rule saved: ${saved.rule}`)
+  }
+}
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
@@ -137,11 +217,18 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('command.run', { command: 'yt' }, async $ => {
-    await $.ui.open({ id: PANE, title: 'yt-briefing', focus: true, closeOnEscape: true })
-    void sweep($, true)
+  on('command.run', { command: 'yt' }, async ($, e) => {
+    if (!(await paneUnseen($, e.origin))) {
+      const opened = await $.ui.open({ id: PANE, title: 'yt-briefing', focus: true, closeOnEscape: true })
+      if (opened.isPlaced) {
+        void sweep($, true)
+        return { text: 'Briefing opened in a pane.' }
+      }
+      await $.ui.close({ id: PANE })
+    }
+    void dialogLoop($)
 
-    return { text: 'Briefing opened in a pane.' }
+    return { text: 'No pane here: the briefing runs in question dialogs.' }
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
