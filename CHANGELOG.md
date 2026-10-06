@@ -5,6 +5,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-10-06
+
+### Fixed
+- **README matches the 1.x code.** `haiku` is described as lighter on plan usage, not faster
+  (the 1.1.0 measurement showed the opposite). The VPS section now says Claude Code must be logged
+  in on the server, with `claude setup-token` for a browserless box, because the engine drops
+  `ANTHROPIC_API_KEY` and an API-key-only server fails. Also documented: summaries count toward
+  the Claude plan's usage, the pane keys need its focus and Esc closes it, and Claude Code on a
+  phone shows no comment field. `data.example` mentions `after_rate`.
+
 ## [1.1.0] - 2026-10-06
 
 ### Changed
