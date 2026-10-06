@@ -15,13 +15,17 @@
  * (or a "credit balance too low" failure). The briefing is meant to run on the login.
  *
  * Env (all optional):
- *   YT_BRIEFING_MODEL   model alias or full name passed to `claude --model` (default: haiku)
+ *   YT_BRIEFING_MODEL   model alias or full name passed to `claude --model` (default: sonnet)
  */
 
 import { spawn, spawnSync } from 'node:child_process';
 
-/** Model alias for every call; one model does both stages, as before. */
-export const DEFAULT_MODEL = 'haiku';
+/**
+ * Model alias for every call; one model does both stages. Sonnet: the summary is the product, and a
+ * subscription login does not bill per token, so the default buys quality over speed. Set
+ * YT_BRIEFING_MODEL=haiku for faster, lighter runs.
+ */
+export const DEFAULT_MODEL = 'sonnet';
 
 export function getModel(): string {
   return process.env.YT_BRIEFING_MODEL || DEFAULT_MODEL;

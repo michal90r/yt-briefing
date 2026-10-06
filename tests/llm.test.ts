@@ -20,10 +20,10 @@ describe('claudeArgs — a bare one-shot run', () => {
 
   it('passes the system prompt and the model', () => {
     expect(args[args.indexOf('--system-prompt') + 1]).toBe('sys');
-    expect(claudeArgs({ model: 'sonnet' })).toEqual(expect.arrayContaining(['--model', 'sonnet']));
+    expect(claudeArgs({ model: 'opus' })).toEqual(expect.arrayContaining(['--model', 'opus']));
   });
 
-  it('defaults to haiku, overridable with YT_BRIEFING_MODEL', () => {
+  it('defaults to sonnet, overridable with YT_BRIEFING_MODEL', () => {
     delete process.env.YT_BRIEFING_MODEL;
     expect(getModel()).toBe(DEFAULT_MODEL);
     process.env.YT_BRIEFING_MODEL = 'opus';

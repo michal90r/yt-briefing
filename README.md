@@ -61,7 +61,7 @@ YT_BRIEFING_YOUTUBE_API_KEY=<key>    # console.cloud.google.com → enable "YouT
 ```
 
 Optional extras: `YT_BRIEFING_MODEL` picks the Claude model for filtering and summaries (default
-`haiku`, any alias or model name `claude --model` accepts), and `YT_BRIEFING_PROXY` routes
+`sonnet`, any alias or model name `claude --model` accepts, `haiku` for faster runs), and `YT_BRIEFING_PROXY` routes
 transcript fetches through a proxy on datacenter/VPS IPs.
 
 4. Onboard:

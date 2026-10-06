@@ -5,6 +5,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-10-06
+
+### Changed
+- **The default model is now `sonnet`, not `haiku`.** The briefing is the product, and on a Claude
+  Code login the model is not billed per token, so the default favours quality. It is not slower
+  either: measured 2026-10-06 on the same 13.8k-word transcript and prompt, Sonnet answered in
+  15.3 s with 413 words, Haiku in 29.4 s with 323 (one run each, so timing is indicative only).
+  `YT_BRIEFING_MODEL=haiku` brings the old default back.
+
 ## [1.0.0] - 2026-10-05
 
 yt-briefing now runs inside Claude Code only. Breaking: the LLM provider, the keys for it, the
