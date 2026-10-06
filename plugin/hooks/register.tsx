@@ -172,14 +172,22 @@ async function paneUnseen($: EngineInterface, origin: { kind: string } | undefin
   return !(await $.session.surfaces()).some(s => s !== 'terminal')
 }
 
+/** The briefing as transcript text: plain, with the filtered-out count at the end. */
+function briefing(out: SweepOut): string {
+  return [plain(out.summary ?? ''), out.skipped ? `(${out.skipped} filtered out)` : undefined]
+    .filter(line => line !== undefined).join('\n\n')
+}
+
 /** The rating loop in the engine's question dialog, from a sweep already run, for a session where no pane can be seen. */
 async function dialogLoop($: EngineInterface, first: SweepOut) {
   let out = first
-  for (;;) {
+  for (let shown = true; ; shown = false) {
     if (out.status !== 'rating_needed' || !out.summary || !out.pending) return void $.ui.log(endText(out))
 
-    const filtered = out.skipped ? `(${out.skipped} filtered out)` : undefined
-    const question = [plain(out.summary), filtered, '', 'Rating?'].filter(line => line !== undefined).join('\n')
+    // The dialog draws its question in a large heading face, so the briefing goes to the
+    // transcript as text and the dialog asks only for the rating. The first is the command's output.
+    if (!shown) $.ui.log(briefing(out))
+    const question = `${out.pending.channel}: rating?`
     let answer: string
     try {
       answer = (await $.ui.ask(question, { header: 'yt-briefing', options: CHOICES })).trim()
@@ -235,7 +243,7 @@ export const register: Register = on => {
     if (first.status !== 'rating_needed') return { text: endText(first) }
     void dialogLoop($, first)
 
-    return { text: 'Briefing ready: rate it in the question dialog.' }
+    return { text: briefing(first) }
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
