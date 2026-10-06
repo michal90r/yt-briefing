@@ -153,64 +153,34 @@ async function comment($: EngineInterface, raw: string) {
   if (saved?.rule) $.ui.toast(`Rule saved: ${saved.rule}`)
 }
 
-/** The dialog's choices; anything else is text typed under "Other". */
-const CHOICES = ['OK', 'Weak', 'Research', 'Stop'] as const
-
-/** The dialog draws plain text: drop the briefing's Markdown marks so no `**` or `###` shows. */
-function plain(md: string): string {
-  return md
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/^_(.+)_$/gm, '$1')
-    .replace(/^(\d+\.)\s+/gm, '$1 ')
-    .replace(/(\d{4}-\d{2}-\d{2})T[\d:.]+Z/g, '$1')
-}
-
 /** True when the person typed /yt through Remote Control and nothing attached can show a pane. */
 async function paneUnseen($: EngineInterface, origin: { kind: string } | undefined): Promise<boolean> {
   if (origin?.kind !== 'bridge') return false
   return !(await $.session.surfaces()).some(s => s !== 'terminal')
 }
 
-/** The briefing as transcript text: plain, with the filtered-out count at the end. */
-function briefing(out: SweepOut): string {
-  return [plain(out.summary ?? ''), out.skipped ? `(${out.skipped} filtered out)` : undefined]
-    .filter(line => line !== undefined).join('\n\n')
-}
-
-/** The rating loop in the engine's question dialog, from a sweep already run, for a session where no pane can be seen. */
-async function dialogLoop($: EngineInterface, first: SweepOut) {
-  let out = first
-  for (let shown = true; ; shown = false) {
-    if (out.status !== 'rating_needed' || !out.summary || !out.pending) return void $.ui.log(endText(out))
-
-    // The dialog draws its question in a large heading face, so the briefing goes to the
-    // transcript as text and the dialog asks only for the rating. The first is the command's output.
-    if (!shown) $.ui.log(briefing(out))
-    const question = `${out.pending.channel}: rating?`
-    let answer: string
-    try {
-      answer = (await $.ui.ask(question, { header: 'yt-briefing', options: CHOICES })).trim()
-    } catch {
-      return
-    }
-
-    if (answer === 'Stop' || answer.toLowerCase() === 'stop' || !answer) return
-    if (answer === 'Research' || answer.startsWith('?')) {
-      if (!(await record($, ['--rating', '1']))) return
-      const q = answer.startsWith('?') ? answer.slice(1).trim() || undefined : undefined
-      return handOff($, out.pending, out.summary, out.lang, q)
-    }
-    const args = answer === 'OK' ? ['--rating', '1'] : answer === 'Weak' ? ['--rating', '0'] : ['--raw-comment', answer]
-    const saved = await record($, args)
-    if (!saved) return
-    $.ui.log(saved.rule ? `Rule saved: ${saved.rule}. Looking for the next video…` : 'Saved. Looking for the next video…')
-    try {
-      out = await runSweep($, false)
-    } catch (err) {
-      return void $.ui.log(`The engine did not answer: ${String(err)}`)
-    }
-  }
+/**
+ * The loop for a session where no pane can be seen, handed to the session as a prompt. A plugin
+ * cannot show a second transcript row a remote client draws (it cannot run its own command, and
+ * its log lines reach only the terminal), so the briefing is the model's own message text and the
+ * dialog asks for the rating alone: its question is drawn in a heading face, too large for a briefing.
+ */
+function remoteLoop(): string {
+  const sweep = engine('yt-sweep').join(' ')
+  const rating = engine('yt-rating').join(' ')
+  const transcript = [...engine('yt-transcript'), '<videoId>', '--lang', 'auto'].join(' ')
+  return [
+    'Run my YouTube briefing here in the chat, one video at a time, until I stop or nothing is left.',
+    '',
+    `1. Run \`${sweep} --reset\` the first time, \`${sweep}\` after that. It prints one JSON line.`,
+    '2. When `status` is `rating_needed`: post `summary` as your whole message, verbatim, Markdown kept. Add nothing before or after it.',
+    '3. Then call AskUserQuestion with one question, exactly `«<pending.title>» — rating?` (nothing else in it), header `yt-briefing`, options OK, Weak, Research, Stop, no descriptions or previews.',
+    `4. OK: \`${rating} --rating 1\`. Weak: \`${rating} --rating 0\`. Text typed under Other: \`${rating} --raw-comment "<the text>"\`. Then back to step 1, without a word in between.`,
+    `5. Research: \`${rating} --rating 1\`, then research the video with me: ask what I want to dig into, pull the transcript with \`${transcript}\` when needed (never paste it), keep what the video claims apart from what you verify.`,
+    '6. Stop, or any other `status`: say so in one short line and end.',
+    '',
+    'Write in the language of the summaries.',
+  ].join('\n')
 }
 
 export const register: Register = on => {
@@ -232,18 +202,10 @@ export const register: Register = on => {
       }
       await $.ui.close({ id: PANE })
     }
-    // No pane to show progress in: the command itself runs while the first sweep does, so the
-    // session shows it working, and only then hands over to the dialogs.
-    let first: SweepOut
-    try {
-      first = await runSweep($, true)
-    } catch (err) {
-      return { text: `The engine did not answer: ${String(err)}` }
-    }
-    if (first.status !== 'rating_needed') return { text: endText(first) }
-    void dialogLoop($, first)
+    // A prompt submitted while this hook holds the command would wait on it: submit once it has answered.
+    $.clock.after(0, () => void $.prompt.submit({ text: remoteLoop() }).catch(err => $.ui.toast(`Could not start the briefing: ${String(err)}`)))
 
-    return { text: briefing(first) }
+    return { text: 'No pane here: the briefing runs in the chat.' }
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {

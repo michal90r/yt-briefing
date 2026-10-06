@@ -5,6 +5,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2026-10-06
+
+### Fixed
+- **Remote `/yt` moves on to the next video.** In 1.2.2 only the first briefing reached a phone or
+  web client: a plugin's log lines are drawn by the terminal alone, and a plugin can neither run its
+  own command nor submit a slash command, so the next briefing never showed while its dialog did,
+  and a second tap rated a video unseen. Remote `/yt` now hands the loop to Claude in the chat: the
+  summary is Claude's message text, and the dialog asks only `«title» — rating?`, so a stray tap at
+  least names the video it rates.
+
 ## [1.2.2] - 2026-10-06
 
 ### Changed

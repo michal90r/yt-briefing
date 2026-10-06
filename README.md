@@ -137,9 +137,10 @@ The **Comment** field takes anything else. Type what you think in your own words
 shows, skip those") and press Enter: Claude turns it into a standing rule for that channel and
 infers the rating. `? your question` starts research with that question, `stop` closes the pane.
 Claude Code on a phone has no text fields, so there the pane shows the four keys only.
-Where no pane can be seen (`/yt` sent from claude.ai/code over Remote Control, or a surface that
-places no panes), the same loop runs in Claude Code's question dialog: the summary as plain text,
-OK / Weak / Research / Stop as choices, and a typed **Other** answer works as the Comment field.
+Where no pane can be seen (`/yt` sent from claude.ai/code or the phone app over Remote Control, or
+a surface that places no panes), `/yt` hands the same loop to Claude in the chat: each summary is
+Claude's message, a short dialog asks for the rating (OK / Weak / Research / Stop), and a typed
+**Other** answer works as the Comment field. This path uses the model, so it counts toward plan usage.
 
 Each step is the engine, not a chat turn: rating a video takes no turn and no context of your
 session, and the next summary is usually ready before you have finished reading the current one.

@@ -21,6 +21,7 @@ function host(on: On, log: { submitted: string[]; toasts: string[]; closed: numb
   on('ui.close', async () => { log.closed += 1; return { value: undefined } })
   on('ui.toast', async (_$, e) => { log.toasts.push(e.text); return { value: undefined } })
   on('ui.log', async (_$, e) => { log.toasts.push(e.text); return { value: undefined } })
+  on('clock.after', async () => ({ value: undefined }))
   on('prompt.submit', async (_$, e) => { log.submitted.push(e.text); return { text: e.text } })
 }
 /** A finished engine subprocess, as `$.process.run` resolves it. */
@@ -143,40 +144,21 @@ test('engine errors are shown, not swallowed', async ($, on) => {
   expect((await ui.find({ text: 'Claude Code CLI not found' }))?.text).toBeDefined()
 })
 
-test('where no pane is placed, /yt rates in question dialogs with plain-text briefings', async ($, on) => {
+test('where no pane is placed, /yt hands the loop to the session: text briefing, rating-only dialog', async ($, on) => {
   const calls: string[][] = []
-  const asked: string[] = []
   const log = newLog()
   host(on, log, false)
-  let sweeps = 0
-  on('process.run', async (_$, e) => {
-    calls.push([...e.argv])
-    if (e.argv.some(a => a.includes('yt-sweep'))) {
-      sweeps += 1
-      return ran(JSON.stringify(sweeps < 3 ? VIDEO : { status: 'done' }))
-    }
-    return ran('{"ok":true,"rule":"Skip panels."}')
-  })
-  const answers = ['OK', 'too many panels']
-  on('tool.call', { tool: 'AskUserQuestion' }, async (_$, e) => {
-    const { questions } = e as unknown as { questions: { question: string }[] }
-    const q = questions[0].question
-    asked.push(q)
-    return { result: { questions, answers: { [q]: answers.shift() ?? 'Stop' } } } as never
-  })
+  on('process.run', async (_$, e) => { calls.push([...e.argv]); return ran('{"ok":true}') })
 
   const out = await $.command.run(YT)
-  expect(out.text).toContain('Point. Something said.')
-  expect(out.text).toContain('(1 filtered out)')
-  expect(out.text).not.toContain('**')
-  for (let i = 0; i < 50 && !log.toasts.join().includes("nothing left"); i++) await new Promise(r => setTimeout(r, 10))
+  for (let i = 0; i < 50 && !log.submitted.length; i++) await new Promise(r => setTimeout(r, 10))
 
+  expect(out.text).toContain('runs in the chat')
   expect(log.closed).toBe(1)
-  expect(asked).toEqual(['@chan: rating?', '@chan: rating?'])
-  expect(log.toasts.filter(t => t.includes('Something said'))).toHaveLength(1)
-  const ratings = calls.filter(c => c.some(a => a.includes('yt-rating')))
-  expect(ratings[0]).toEqual(expect.arrayContaining(['--rating', '1']))
-  expect(ratings[1]).toEqual(expect.arrayContaining(['--raw-comment', 'too many panels']))
-  expect(log.toasts.join()).toContain('Skip panels.')
-  expect(log.toasts.join()).toContain('nothing left to rate')
+  expect(calls).toEqual([])
+  expect(log.submitted).toHaveLength(1)
+  expect(log.submitted[0]).toMatch(/yt-sweep\S* --reset/)
+  expect(log.submitted[0]).toContain('verbatim')
+  expect(log.submitted[0]).toContain('«<pending.title>» — rating?')
+  expect(log.submitted[0]).toMatch(/yt-rating\S* --rating 0/)
 })
