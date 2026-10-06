@@ -61,8 +61,9 @@ YT_BRIEFING_YOUTUBE_API_KEY=<key>    # console.cloud.google.com → enable "YouT
 ```
 
 Optional extras: `YT_BRIEFING_MODEL` picks the Claude model for filtering and summaries (default
-`sonnet`, any alias or model name `claude --model` accepts, `haiku` for faster runs), and `YT_BRIEFING_PROXY` routes
-transcript fetches through a proxy on datacenter/VPS IPs.
+`sonnet`, any alias or model name `claude --model` accepts, `haiku` to go lighter on your plan's
+usage limits), and `YT_BRIEFING_PROXY` routes transcript fetches through a proxy on
+datacenter/VPS IPs.
 
 4. Onboard:
 
@@ -122,6 +123,9 @@ it to go deeper, lower it for a quicker pass:
 Open your project in Claude Code and type `/yt`. The briefing opens in a pane: the summary, and
 under it four keys.
 
+The keys work while the pane has the focus (it takes it when it opens, `/yt` from an empty
+prompt), and Esc closes it.
+
 | Key | What it does |
 |-----|--------------|
 | `1` OK | Neutral. The video is marked as seen, the next one loads. |
@@ -132,9 +136,12 @@ under it four keys.
 The **Comment** field takes anything else. Type what you think in your own words ("too many panel
 shows, skip those") and press Enter: Claude turns it into a standing rule for that channel and
 infers the rating. `? your question` starts research with that question, `stop` closes the pane.
+Claude Code on a phone has no text fields, so there the pane shows the four keys only.
 
-Each step is the engine, not a chat turn: rating a video costs no tokens of your session, and
-the next summary is usually ready before you have finished reading the current one.
+Each step is the engine, not a chat turn: rating a video takes no turn and no context of your
+session, and the next summary is usually ready before you have finished reading the current one.
+The summaries themselves still count toward your Claude plan's usage, like any other Claude Code
+work.
 
 `/yt` is a Claude Code mod (a plugin in `.claude/skills/yt-briefing/`). Claude Code loads it on
 its own once you trust the project folder. If `/yt` is not listed, start a fresh session. To
@@ -194,6 +201,11 @@ at a separate private repo) and commit after each rating: set `"after_rate"` in
 [docs/sync-across-machines.md](./docs/sync-across-machines.md).
 
 ## Running on a VPS
+
+Claude Code has to be installed and logged in on the server too, because the engine runs
+`claude -p` there. With no browser on the box, `claude setup-token` creates a long-lived login
+token for your subscription. An `ANTHROPIC_API_KEY` alone is not enough: the engine removes it
+for its calls (see above), so a server set up only with an API key fails with a login error.
 
 YouTube blocks datacenter IPs, so transcript fetches fail on most servers. Route them through a
 free Cloudflare WARP proxy. See [docs/warp-proxy.md](./docs/warp-proxy.md).
