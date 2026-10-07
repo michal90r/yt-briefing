@@ -8,7 +8,7 @@
  *   1. Output language for summaries + ratings   → DATA_DIR/config.json
  *   2. The channels you follow — just a flat list of handles
  *      → DATA_DIR/channels.md, DATA_DIR/state.md, DATA_DIR/channels/<slug>.md
- *   3. Installs /yt (the rating pane) + /yt-transcribe + /yt-search into this Claude Code project
+ *   3. Installs /yt (the rating loop) + /yt-transcribe + /yt-search into this Claude Code project
  *
  * It does NOT touch keys: the one key (YouTube Data API) lives in your project root .env (see README →
  * Setup); the engine reads it at run time. Filters and summaries run on your Claude Code login. Re-running is safe: it warns before overwriting existing data and bails.
@@ -137,7 +137,7 @@ function main(): void {
 
   console.log('\n  Next:');
   console.log('    1. Open this folder in Claude Code (trust it when asked).');
-  console.log('    2. Type  /yt  — the briefing opens in a pane.  (/yt-transcribe <url> for one video)\n');
+  console.log('    2. Type  /yt  — the briefing runs in the chat.  (/yt-transcribe <url> for one video)\n');
 }
 
 try { main(); } catch (err) { console.error(err); process.exit(1); }

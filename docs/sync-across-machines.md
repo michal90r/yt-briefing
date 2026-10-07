@@ -99,7 +99,7 @@ version, so every machine gets the setting):
 }
 ```
 
-The engine runs `after_rate` after every recorded rating, from the pane and from the CLI
+The engine runs `after_rate` after every recorded rating, from `/yt` and from the CLI
 (`yt-briefing rate`) alike. It runs detached from the project root, so a slow push never holds the
 next video, and a failing script never fails the rating (the rating is already on disk). The
 engine itself still never runs git: the command is yours.

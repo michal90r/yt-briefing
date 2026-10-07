@@ -16,8 +16,8 @@ It also gets better the more you use it. You give each summary a quick rating, w
 or not, and from that it learns what to keep showing you and what to drop. Over time the queue
 becomes yours: less noise, more of what you care about.
 
-yt-briefing runs inside [Claude Code](https://claude.com/claude-code). `/yt` opens the briefing in
-a pane next to your chat, and the filtering and summaries run on your own Claude Code login. There
+yt-briefing runs inside [Claude Code](https://claude.com/claude-code). `/yt` runs the briefing in
+your chat, and the filtering and summaries run on your own Claude Code login. There
 is no separate model, provider or LLM key to set up.
 
 ## First run vs later
@@ -120,35 +120,25 @@ it to go deeper, lower it for a quicker pass:
 
 ## Run it
 
-Open your project in Claude Code and type `/yt`. The briefing opens in a pane: the summary, and
-under it four keys.
+Open your project in Claude Code and type `/yt`. Each summary arrives as Claude's message in the
+chat, and a short dialog under it asks for the rating:
 
-The keys work while the pane has the focus (it takes it when it opens, `/yt` from an empty
-prompt), and Esc closes it.
+| Answer | What it does |
+|--------|--------------|
+| OK | Neutral. The video is marked as seen, the next one loads. |
+| Weak | Worthless. The title goes to the channel's skip examples, so the filter learns to drop titles like it. |
+| Research | Ends the loop and hands this video to Claude, see below. |
+| Stop | Ends the loop. The next `/yt` resumes where you stopped. |
 
-| Key | What it does |
-|-----|--------------|
-| `1` OK | Neutral. The video is marked as seen, the next one loads. |
-| `2` Weak | Worthless. The title goes to the channel's skip examples, so the filter learns to drop titles like it. |
-| `3` Research | Ends the loop and hands this video to Claude, see below. |
-| `4` Stop | Closes the pane. The next `/yt` resumes where you stopped. |
+The dialog's **Other** field takes anything else. Type what you think in your own words ("too many
+panel shows, skip those"): Claude turns it into a standing rule for that channel and infers the
+rating. `? your question` starts research with that question, `stop` ends the loop. A prompt you
+type in the chat also ends it.
 
-The **Comment** field takes anything else. Type what you think in your own words ("too many panel
-shows, skip those") and press Enter: Claude turns it into a standing rule for that channel and
-infers the rating. `? your question` starts research with that question, `stop` closes the pane.
-Claude Code on a phone has no text fields, so there the pane shows the four keys only.
-Where no pane can be seen (`/yt` sent from claude.ai/code or the phone app over Remote Control, or
-a surface that places no panes), `/yt` hands the same loop to Claude in the chat: each summary is
-Claude's message, a short dialog asks for the rating (OK / Weak / Research / Stop), and a typed
-**Other** answer works as the Comment field. This path uses the model, so it counts toward plan usage.
-
-Prefer one window with no side pane? Set `"ui": "chat"` in `.yt-briefing/data/config.json`
-(default `"pane"`). `/yt` then always runs in the chat, as described above.
-
-Each step is the engine, not a chat turn: rating a video takes no turn and no context of your
-session, and the next summary is usually ready before you have finished reading the current one.
-The summaries themselves still count toward your Claude plan's usage, like any other Claude Code
-work.
+It works the same in the terminal, the desktop app, claude.ai/code and the phone app. Each summary
+is a turn of its own that ends with the summary, so the phone app shows it whole instead of folding
+it into a one-line digest. Claude pastes the summary the engine wrote, so a turn is short, but it
+still counts toward your Claude plan's usage, like the summaries themselves.
 
 `/yt` is a Claude Code mod (a plugin in `.claude/skills/yt-briefing/`). Claude Code loads it on
 its own once you trust the project folder. If `/yt` is not listed, start a fresh session. To
@@ -159,8 +149,8 @@ installs `/yt`, `/yt-transcribe` and `/yt-search`).
 
 Tech channels announce something new every week, and the usual fate is "looks interesting" →
 to-do list → never. So next to OK/Weak there is a third key: **Research**. Press it, or type
-`? your question` into the comment field, and the loop ends there: the pane closes and the video
-lands in your chat with its briefing and the command for its full transcript. Claude works your
+`? your question` into the dialog's Other field, and the loop ends there: the video lands in your
+chat with its briefing and the command for its full transcript. Claude works your
 question with you, against your own codebase if you ask "would this fit my project", against the
 web if the claims need checking. A quick feedback loop instead of a shelf. The video is marked as
 seen, and the next `/yt` resumes the queue right where you broke off.
@@ -169,8 +159,8 @@ seen, and the next `/yt` resumes the queue right where you broke off.
 
 1.0 runs on Claude Code only. The OpenAI-compatible provider and its three `YT_BRIEFING_LLM_*`
 keys are gone (delete them from `.env`), and the chat-driven `/yt` skill with its rating popup is
-replaced by the pane. Run `npx yt-briefing install-skill` once in your project: it installs the
-pane, and removes the old `/yt` skill and the summary-gate hook from `.claude/settings.json`. Your
+replaced by the `/yt` mod. Run `npx yt-briefing install-skill` once in your project: it installs
+the mod, and removes the old `/yt` skill and the summary-gate hook from `.claude/settings.json`. Your
 channels, profiles and ratings in `.yt-briefing/data/` carry over unchanged.
 
 ## Why Claude Code, and nothing else
@@ -182,13 +172,12 @@ is set in your environment, the engine removes it for that call, because Claude 
 otherwise bill it as API usage instead of using your login.
 
 The engine still works ahead in the background. It expands channels in parallel and summarizes the
-next video while you rate the current one, so each step is usually ready with no wait. The pane
-only shows what the engine produced and sends your key presses back to it.
+next video while you rate the current one, so each step is usually ready with no wait. The mod
+asks for the rating and records it itself, so the model never has to remember the protocol.
 
-Supporting every agent that reads `SKILL.md` meant a chat loop for the rating: the model pasted
-each summary, asked the question and recorded the answer, every video a full turn, plus a hook to
-make sure the summary was really shown. A Claude Code pane does the same with no model in the loop,
-which is why 1.0 drops the other agents.
+Supporting every agent that reads `SKILL.md` meant leaving the rating to the model: it asked the
+question and recorded the answer, plus a hook to make sure the summary was really shown. A Claude
+Code mod drives the loop itself, which is why 1.0 drops the other agents.
 
 ## Why one transcript at a time
 

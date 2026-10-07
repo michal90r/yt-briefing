@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.3.0] - 2026-10-07
 
-### Added
-- **`"ui": "chat"` in `config.json` runs `/yt` in the chat instead of a side pane.** The summary
-  is Claude's message and a short dialog asks for the rating, the same loop that already ran where
-  no pane can be seen. It is opt-in, so nothing changes unless you set it. New engine command
-  `yt-ui` prints the setting for the plugin.
+### Changed
+- **`/yt` runs in the chat on every surface; the side pane is gone.** Each summary is Claude's
+  message and a short dialog under it asks for the rating (OK / Weak / Research / Stop, or your
+  own words in Other). This is the loop that already ran over Remote Control, now the only one, so
+  the terminal, the desktop app and the phone behave the same. There is no setting to bring the
+  pane back.
 
 ## [1.2.5] - 2026-10-07
 

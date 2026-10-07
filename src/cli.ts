@@ -6,7 +6,7 @@
  * or Bun), passing remaining args through.
  *
  *   yt-briefing init                       interactive onboarding wizard
- *   yt-briefing install-skill              install /yt (pane) + skills into a Claude Code project
+ *   yt-briefing install-skill              install /yt + skills into a Claude Code project
  *   yt-briefing add|remove <@handle|url>   add or remove channels (also list)
  *   yt-briefing list                       list the channels you follow
  *   yt-briefing sweep [--reset]            advance one step; prints a JSON status line

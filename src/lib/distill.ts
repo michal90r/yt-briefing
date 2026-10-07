@@ -2,8 +2,8 @@
  * Turn a raw rating comment ("too much politics, skip these panels") into what the profile
  * stores: one clean, generalizable rule for `## Notes`, plus the rating it implies.
  *
- * This used to be the agent's job in the chat loop. With the rating loop in a pane there is no
- * agent turn per video, so the engine does it with the same `claude -p` call it uses everywhere.
+ * This used to be the agent's job in the chat loop. The mod records ratings itself, with no agent
+ * step for it, so the engine does it with the same `claude -p` call it uses everywhere.
  */
 import { chat } from './llm.ts';
 

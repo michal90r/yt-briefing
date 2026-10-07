@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * install-skill — install yt-briefing into a Claude Code project: the `/yt` mod (the rating pane)
+ * install-skill — install yt-briefing into a Claude Code project: the `/yt` mod (the rating loop)
  * plus the `/yt-transcribe` and `/yt-search` skills, all under `<project>/.claude/skills/`.
  *
  *   yt-briefing install-skill        # interactive: which project folder
@@ -16,7 +16,7 @@ import { question } from './lib/prompt.ts';
 
 const ask = (q: string, def = ''): string => question(def ? `${q} [${def}]:` : `${q}:`).trim() || def;
 
-console.log('\n  Install /yt (pane) + /yt-transcribe + /yt-search into a Claude Code project.\n');
+console.log('\n  Install /yt + /yt-transcribe + /yt-search into a Claude Code project.\n');
 console.log('    1) This project (current folder) — recommended');
 console.log('    2) Another project folder\n');
 

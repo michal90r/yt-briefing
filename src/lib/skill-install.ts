@@ -6,7 +6,7 @@
  * `<project>/.claude/skills/`:
  *
  *   yt-briefing/   the Claude Code mod (a plugin of function hooks) behind `/yt`: the rating loop
- *                  as a pane. Claude Code loads a plugin from the project's skills folder by itself
+ *                  in the chat. Claude Code loads a plugin from the project's skills folder by itself
  *                  (as `yt-briefing@skills-dir`) once the workspace is trusted.
  *   yt-transcribe/ one-shot skill: a single video's transcript → summary.
  *   yt-search/     skill: search within one channel → triage → comparison.
@@ -93,7 +93,7 @@ export function skillBody(name: string, dist = false): string {
 }
 
 /**
- * The mod's `hooks/engine.ts`: how the pane runs the engine. `dist=false` is the shipped dev form;
+ * The mod's `hooks/engine.ts`: how the mod runs the engine. `dist=false` is the shipped dev form;
  * `dist=true` points at the compiled scripts, relative to the project root (the session's cwd).
  */
 export function engineModule(dist = false): string {
@@ -101,7 +101,7 @@ export function engineModule(dist = false): string {
   if (!dist) return shipped;
   const rel = toProjectRel(DIST_DIR);
   return [
-    '// How the pane runs the engine, relative to the project root (the session\'s working directory).',
+    '// How the mod runs the engine, relative to the project root (the session\'s working directory).',
     '// Written by `yt-briefing install-skill`; re-run it after moving the project or switching runtime.',
     `export const engine = (name: string): string[] => ['${runtimeName()}', \`${rel}/\${name}.js\`]`,
     '',
