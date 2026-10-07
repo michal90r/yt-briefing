@@ -1,6 +1,6 @@
 {
   "name": "yt-briefing",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "A self-learning YouTube briefing for Claude Code: it sweeps the channels you follow, filters noise in two stages (title, then transcript), gives you a short briefing of the rest in your language in a pane, and adapts to your ratings — one video at a time.",
   "type": "module",
   "bin": {

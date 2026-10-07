@@ -5,6 +5,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] - 2026-10-07
+
+### Fixed
+- **Remote `/yt` shows each summary whole on a phone.** The Claude app folds text written mid-turn
+  into a one-line digest and shows only a turn's last message in full, so a summary posted before
+  the rating dialog arrived as a digest. Each briefing is now a turn of its own that ends with the
+  summary, and the plugin opens the `«title» — rating?` dialog once that turn has ended, records
+  the answer and asks for the next one. A tap in the first 1.5 s of a dialog is ignored as one meant
+  for the dialog before it, and a prompt you type ends the loop.
+
 ## [1.2.3] - 2026-10-06
 
 ### Fixed

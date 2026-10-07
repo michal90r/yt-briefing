@@ -159,28 +159,80 @@ async function paneUnseen($: EngineInterface, origin: { kind: string } | undefin
   return !(await $.session.surfaces()).some(s => s !== 'terminal')
 }
 
-/**
- * The loop for a session where no pane can be seen, handed to the session as a prompt. A plugin
- * cannot show a second transcript row a remote client draws (it cannot run its own command, and
- * its log lines reach only the terminal), so the briefing is the model's own message text and the
- * dialog asks for the rating alone: its question is drawn in a heading face, too large for a briefing.
- */
-function remoteLoop(): string {
-  const sweep = engine('yt-sweep').join(' ')
-  const rating = engine('yt-rating').join(' ')
-  const transcript = [...engine('yt-transcript'), '<videoId>', '--lang', 'auto'].join(' ')
+// Where no pane can be seen the loop runs in the chat. A phone or web client draws a plugin's
+// command output and its dialogs, but not its log lines, and it folds text written mid-turn into a
+// one-line digest; only a turn's last message shows whole. So each briefing is the model's whole
+// answer to a prompt this plugin submits, and the rating dialog opens once that turn has ended.
+
+/** True while the chat loop runs; a prompt the person types ends it. */
+let looping = false
+
+/** An answer this soon after its dialog opened is a tap meant for the dialog before it. */
+const STRAY_TAP_MS = 1500
+
+const CHOICES = ['OK', 'Weak', 'Research', 'Stop'] as const
+
+/** The prompt for one briefing: the model sweeps and answers with the summary alone. */
+function fetchPrompt(reset: boolean): string {
+  const sweep = [...engine('yt-sweep'), ...(reset ? ['--reset'] : [])].join(' ')
   return [
-    'Run my YouTube briefing here in the chat, one video at a time, until I stop or nothing is left.',
-    '',
-    `1. Run \`${sweep} --reset\` the first time, \`${sweep}\` after that. It prints one JSON line.`,
-    '2. When `status` is `rating_needed`: post `summary` as your whole message, verbatim, Markdown kept. Add nothing before or after it.',
-    '3. Then call AskUserQuestion with one question, exactly `«<pending.title>» — rating?` (nothing else in it), header `yt-briefing`, options OK, Weak, Research, Stop, no descriptions or previews.',
-    `4. OK: \`${rating} --rating 1\`. Weak: \`${rating} --rating 0\`. Text typed under Other: \`${rating} --raw-comment "<the text>"\`. Then back to step 1, without a word in between.`,
-    `5. Research: \`${rating} --rating 1\`, then research the video with me: ask what I want to dig into, pull the transcript with \`${transcript}\` when needed (never paste it), keep what the video claims apart from what you verify.`,
-    '6. Stop, or any other `status`: say so in one short line and end.',
-    '',
-    'Write in the language of the summaries.',
+    `Next video of my YouTube briefing: run \`${sweep}\`. It prints one JSON line.`,
+    'If `status` is `rating_needed`, answer with `summary` verbatim as your whole message, Markdown kept: nothing before or after it, no question, no tool call after it (the rating dialog follows on its own).',
+    'Otherwise answer with one short line saying why there is nothing to rate. Write in the language of the summaries.',
   ].join('\n')
+}
+
+/** Submit a prompt once the hook that wants it has answered: one submitted from inside would wait on it. */
+function submitLater($: EngineInterface, text: string) {
+  $.clock.after(0, () => void $.prompt.submit({ text }).catch(err => {
+    looping = false
+    $.ui.toast(`Could not continue the briefing: ${String(err)}`)
+  }))
+}
+
+/** After a briefing turn: ask for the rating, record it and fetch the next one. */
+async function rateAfterTurn($: EngineInterface) {
+  let out: SweepOut
+  try {
+    out = await runSweep($, false)
+  } catch {
+    looping = false
+    return
+  }
+  if (out.status !== 'rating_needed' || !out.pending || !out.summary) {
+    looping = false
+    return
+  }
+  const title = out.pending.title.length > 80 ? `${out.pending.title.slice(0, 79)}…` : out.pending.title
+  let answer: string
+  for (;;) {
+    const opened = Date.now()
+    try {
+      answer = (await $.ui.ask(`«${title}» — rating?`, { header: 'yt-briefing', options: CHOICES })).trim()
+    } catch {
+      looping = false
+      return
+    }
+    if (!looping) return
+    if (Date.now() - opened >= STRAY_TAP_MS) break
+  }
+
+  if (answer === 'Stop' || answer.toLowerCase() === 'stop' || !answer) {
+    looping = false
+    return
+  }
+  if (answer === 'Research' || answer.startsWith('?')) {
+    looping = false
+    if (!(await record($, ['--rating', '1']))) return
+    const q = answer.startsWith('?') ? answer.slice(1).trim() || undefined : undefined
+    return handOff($, out.pending, out.summary, out.lang, q)
+  }
+  const args = answer === 'OK' ? ['--rating', '1'] : answer === 'Weak' ? ['--rating', '0'] : ['--raw-comment', answer]
+  if (!(await record($, args))) {
+    looping = false
+    return
+  }
+  submitLater($, fetchPrompt(false))
 }
 
 export const register: Register = on => {
@@ -202,10 +254,20 @@ export const register: Register = on => {
       }
       await $.ui.close({ id: PANE })
     }
-    // A prompt submitted while this hook holds the command would wait on it: submit once it has answered.
-    $.clock.after(0, () => void $.prompt.submit({ text: remoteLoop() }).catch(err => $.ui.toast(`Could not start the briefing: ${String(err)}`)))
+    looping = true
+    submitLater($, fetchPrompt(true))
 
     return { text: 'No pane here: the briefing runs in the chat.' }
+  })
+
+  on('prompt.submit', async ($, e, next) => {
+    if (looping && e.origin?.kind !== 'plugin') looping = false
+    return next(e)
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    if (looping && !e.agentId && e.reason === 'answer') void rateAfterTurn($)
+    return next(e)
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {

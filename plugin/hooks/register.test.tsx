@@ -22,6 +22,7 @@ function host(on: On, log: { submitted: string[]; toasts: string[]; closed: numb
   on('ui.toast', async (_$, e) => { log.toasts.push(e.text); return { value: undefined } })
   on('ui.log', async (_$, e) => { log.toasts.push(e.text); return { value: undefined } })
   on('clock.after', async () => ({ value: undefined }))
+  on('turn.complete', async (_$, e) => ({ text: e.answer }))
   on('prompt.submit', async (_$, e) => { log.submitted.push(e.text); return { text: e.text } })
 }
 /** A finished engine subprocess, as `$.process.run` resolves it. */
@@ -144,21 +145,43 @@ test('engine errors are shown, not swallowed', async ($, on) => {
   expect((await ui.find({ text: 'Claude Code CLI not found' }))?.text).toBeDefined()
 })
 
-test('where no pane is placed, /yt hands the loop to the session: text briefing, rating-only dialog', async ($, on) => {
+test('where no pane is placed, each briefing is a chat turn and the rating dialog follows it', async ($, on) => {
   const calls: string[][] = []
+  const asked: string[] = []
   const log = newLog()
   host(on, log, false)
-  on('process.run', async (_$, e) => { calls.push([...e.argv]); return ran('{"ok":true}') })
+  on('process.run', async (_$, e) => {
+    calls.push([...e.argv])
+    if (e.argv.some(a => a.includes('yt-sweep'))) return ran(JSON.stringify(VIDEO))
+    return ran('{"ok":true}')
+  })
+  // The first answer comes at once, as a second tap on the dialog before would: it must be ignored.
+  const answers: [string, number][] = [['Weak', 0], ['OK', 1600]]
+  on('tool.call', { tool: 'AskUserQuestion' }, async (_$, e) => {
+    const { questions } = e as unknown as { questions: { question: string }[] }
+    const q = questions[0].question
+    asked.push(q)
+    const [answer, wait] = answers.shift() ?? ['Stop', 0]
+    await new Promise(r => setTimeout(r, wait))
+    return { result: { questions, answers: { [q]: answer } } } as never
+  })
+  const until = async (ok: () => boolean) => { for (let i = 0; i < 100 && !ok(); i++) await new Promise(r => setTimeout(r, 30)) }
 
   const out = await $.command.run(YT)
-  for (let i = 0; i < 50 && !log.submitted.length; i++) await new Promise(r => setTimeout(r, 10))
-
   expect(out.text).toContain('runs in the chat')
   expect(log.closed).toBe(1)
-  expect(calls).toEqual([])
-  expect(log.submitted).toHaveLength(1)
+  await until(() => log.submitted.length > 0)
   expect(log.submitted[0]).toMatch(/yt-sweep\S* --reset/)
   expect(log.submitted[0]).toContain('verbatim')
-  expect(log.submitted[0]).toContain('«<pending.title>» — rating?')
-  expect(log.submitted[0]).toMatch(/yt-rating\S* --rating 0/)
+  expect(asked).toEqual([])
+
+  await $.turn.complete({ answer: 'the summary', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  await until(() => log.submitted.length > 1)
+
+  expect(asked).toEqual(['«A video» — rating?', '«A video» — rating?'])
+  const ratings = calls.filter(c => c.some(a => a.includes('yt-rating')))
+  expect(ratings).toHaveLength(1)
+  expect(ratings[0]).toEqual(expect.arrayContaining(['--rating', '1']))
+  expect(log.submitted[1]).toMatch(/yt-sweep\S*`/)
+  expect(log.submitted[1]).not.toContain('--reset')
 })
