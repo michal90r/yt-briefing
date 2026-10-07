@@ -58,7 +58,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
       plugin: 'yt-briefing', surface, component: 'Pane', requestId: 'yt-briefing', props: PANE_PROPS as never,
     })
 
-    expect(calls[0]).toContain('--reset')
+    expect(calls.find(c => c.some(a => a.includes('yt-sweep')))).toContain('--reset')
     expect((await ui.find({ type: 'Markdown' }))?.text).toContain('Something said')
     expect((await ui.find({ text: 'Skipped 1' }))?.text).toContain('@chan «A short» — short')
 
@@ -147,6 +147,26 @@ test('engine errors are shown, not swallowed', async ($, on) => {
   })
 
   expect((await ui.find({ text: 'Claude Code CLI not found' }))?.text).toBeDefined()
+})
+
+test('ui "chat" in config.json runs the chat loop although a pane could be placed', async ($, on) => {
+  const log = newLog()
+  let opened = 0
+  host(on, log)
+  on('ui.open', async () => { opened += 1; return { value: { isPlaced: true as const } } })
+  on('process.run', async (_$, e) => {
+    if (e.argv.some(a => a.includes('yt-ui'))) return ran('chat\n')
+    if (e.argv.some(a => a.includes('yt-sweep'))) return ran(JSON.stringify(VIDEO))
+    return ran('{"ok":true}')
+  })
+  on('tool.call', { tool: 'AskUserQuestion' }, async (_$, e) => {
+    const { questions } = e as unknown as { questions: { question: string }[] }
+    return { result: { questions, answers: { [questions[0].question]: 'Stop' } } } as never
+  })
+
+  const out = await $.command.run(YT)
+  expect(out.text).toContain('runs in the chat')
+  expect(opened).toBe(0)
 })
 
 test('where no pane is placed, each briefing is a chat turn and the rating dialog follows it', async ($, on) => {

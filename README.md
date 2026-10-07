@@ -142,6 +142,9 @@ a surface that places no panes), `/yt` hands the same loop to Claude in the chat
 Claude's message, a short dialog asks for the rating (OK / Weak / Research / Stop), and a typed
 **Other** answer works as the Comment field. This path uses the model, so it counts toward plan usage.
 
+Prefer one window with no side pane? Set `"ui": "chat"` in `.yt-briefing/data/config.json`
+(default `"pane"`). `/yt` then always runs in the chat, as described above.
+
 Each step is the engine, not a chat turn: rating a video takes no turn and no context of your
 session, and the next summary is usually ready before you have finished reading the current one.
 The summaries themselves still count toward your Claude plan's usage, like any other Claude Code

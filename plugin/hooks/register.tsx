@@ -253,7 +253,8 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'yt' }, async ($, e) => {
-    if (!(await paneUnseen($, e.origin))) {
+    const wantsChat = (await $.process.run(engine('yt-ui'), { timeoutMs: 10_000 }).catch(() => null))?.stdout.trim() === 'chat'
+    if (!wantsChat && !(await paneUnseen($, e.origin))) {
       const opened = await $.ui.open({ id: PANE, title: 'yt-briefing', focus: true, closeOnEscape: true })
       if (opened.isPlaced) {
         void sweep($, true)
@@ -264,7 +265,7 @@ export const register: Register = on => {
     looping = true
     submitLater($, true)
 
-    return { text: 'No pane here: the briefing runs in the chat.' }
+    return { text: wantsChat ? 'The briefing runs in the chat.' : 'No pane here: the briefing runs in the chat.' }
   })
 
   // The engine shows a plugin none of its own prompts, so a prompt seen here is the person's.

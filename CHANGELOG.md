@@ -5,6 +5,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-10-07
+
+### Added
+- **`"ui": "chat"` in `config.json` runs `/yt` in the chat instead of a side pane.** The summary
+  is Claude's message and a short dialog asks for the rating, the same loop that already ran where
+  no pane can be seen. It is opt-in, so nothing changes unless you set it. New engine command
+  `yt-ui` prints the setting for the plugin.
+
 ## [1.2.5] - 2026-10-07
 
 ### Changed
