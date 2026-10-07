@@ -172,19 +172,26 @@ const STRAY_TAP_MS = 1500
 
 const CHOICES = ['OK', 'Weak', 'Research', 'Stop'] as const
 
-/** The prompt for one briefing: the model sweeps and answers with the summary alone. */
-function fetchPrompt(reset: boolean): string {
+/** What a briefing turn must do, read from the system prompt while the loop runs. */
+function loopSection(reset: boolean): string {
   const sweep = [...engine('yt-sweep'), ...(reset ? ['--reset'] : [])].join(' ')
   return [
-    `Next video of my YouTube briefing: run \`${sweep}\`. It prints one JSON line.`,
-    'If `status` is `rating_needed`, answer with `summary` verbatim as your whole message, Markdown kept: nothing before or after it, no question, no tool call after it (the rating dialog follows on its own).',
+    `The yt-briefing plugin is running the person's YouTube briefing. A user message reading exactly "${NEXT_TEXT}" is its request for the next video:`,
+    `run \`${sweep}\`; it prints one JSON line. If \`status\` is \`rating_needed\`, answer with \`summary\` verbatim as your whole message, Markdown kept: nothing before or after it, no question, no tool call after it (the plugin opens the rating dialog itself).`,
     'Otherwise answer with one short line saying why there is nothing to rate. Write in the language of the summaries.',
   ].join('\n')
 }
 
-/** Submit a prompt once the hook that wants it has answered: one submitted from inside would wait on it. */
-function submitLater($: EngineInterface, text: string) {
-  $.clock.after(0, () => void $.prompt.submit({ text }).catch(err => {
+/** What the chat shows of each briefing prompt; the instructions ride along as unseen context. */
+const NEXT_TEXT = 'yt: next video'
+
+/** Whether the next briefing prompt starts a fresh sweep. */
+let resetNext = false
+
+/** Ask for a briefing once the hook that wants it has answered: one submitted from inside would wait on it. */
+function submitLater($: EngineInterface, reset: boolean) {
+  resetNext = reset
+  $.clock.after(0, () => void $.prompt.submit({ text: NEXT_TEXT, asUser: true }).catch(err => {
     looping = false
     $.ui.toast(`Could not continue the briefing: ${String(err)}`)
   }))
@@ -232,7 +239,7 @@ async function rateAfterTurn($: EngineInterface) {
     looping = false
     return
   }
-  submitLater($, fetchPrompt(false))
+  submitLater($, false)
 }
 
 export const register: Register = on => {
@@ -255,14 +262,22 @@ export const register: Register = on => {
       await $.ui.close({ id: PANE })
     }
     looping = true
-    submitLater($, fetchPrompt(true))
+    submitLater($, true)
 
     return { text: 'No pane here: the briefing runs in the chat.' }
   })
 
+  // The engine shows a plugin none of its own prompts, so a prompt seen here is the person's.
   on('prompt.submit', async ($, e, next) => {
     if (looping && e.origin?.kind !== 'plugin') looping = false
     return next(e)
+  })
+
+  // The loop's instructions ride in the system prompt, so the chat shows only NEXT_TEXT.
+  on('prompt.compose', async ($, e, next) => {
+    const composed = await next(e)
+    if (!looping) return composed
+    return { sections: [...composed.sections, { id: 'yt-briefing:loop', text: loopSection(resetNext), scope: 'session' as const }] }
   })
 
   on('turn.complete', async ($, e, next) => {

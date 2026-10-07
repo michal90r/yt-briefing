@@ -1,6 +1,6 @@
 {
   "name": "yt-briefing",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "The /yt briefing loop as a Claude Code pane: summary, one-key rating, research hand-off.",
   "author": {
     "name": "Michal Ryzio"

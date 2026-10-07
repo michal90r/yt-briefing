@@ -23,7 +23,8 @@ function host(on: On, log: { submitted: string[]; toasts: string[]; closed: numb
   on('ui.log', async (_$, e) => { log.toasts.push(e.text); return { value: undefined } })
   on('clock.after', async () => ({ value: undefined }))
   on('turn.complete', async (_$, e) => ({ text: e.answer }))
-  on('prompt.submit', async (_$, e) => { log.submitted.push(e.text); return { text: e.text } })
+  on('prompt.compose', async () => ({ sections: [{ id: 'intro', text: 'base', scope: 'shared' as const }] }))
+  on('prompt.submit', async (_$, e) => { log.submitted.push([e.text, ...(e.context ?? [])].join('\n')); return { text: e.text } })
 }
 /** A finished engine subprocess, as `$.process.run` resolves it. */
 const ran = (stdout: string, exitCode = 0, stderr = '') =>
@@ -31,6 +32,9 @@ const ran = (stdout: string, exitCode = 0, stderr = '') =>
 
 /** `/yt` as the person typing it. */
 const YT = { command: 'yt' } as never
+
+/** A prompt.compose input as the engine raises it. */
+const COMPOSE = { model: 'm', promptModel: 'm', surfaces: [], tools: [], outputStyle: { name: 'default', isKeepingCodingInstructions: true }, traits: [] } as never
 
 const newLog = () => ({ submitted: [] as string[], toasts: [] as string[], closed: 0 })
 
@@ -171,8 +175,10 @@ test('where no pane is placed, each briefing is a chat turn and the rating dialo
   expect(out.text).toContain('runs in the chat')
   expect(log.closed).toBe(1)
   await until(() => log.submitted.length > 0)
-  expect(log.submitted[0]).toMatch(/yt-sweep\S* --reset/)
-  expect(log.submitted[0]).toContain('verbatim')
+  expect(log.submitted).toEqual(['yt: next video'])
+  const loop = async () => (await $.prompt.compose(COMPOSE)).sections.find(x => x.id === 'yt-briefing:loop')?.text ?? ''
+  expect(await loop()).toMatch(/yt-sweep\S* --reset/)
+  expect(await loop()).toContain('verbatim')
   expect(asked).toEqual([])
 
   await $.turn.complete({ answer: 'the summary', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
@@ -182,6 +188,7 @@ test('where no pane is placed, each briefing is a chat turn and the rating dialo
   const ratings = calls.filter(c => c.some(a => a.includes('yt-rating')))
   expect(ratings).toHaveLength(1)
   expect(ratings[0]).toEqual(expect.arrayContaining(['--rating', '1']))
-  expect(log.submitted[1]).toMatch(/yt-sweep\S*`/)
-  expect(log.submitted[1]).not.toContain('--reset')
+  expect(log.submitted[1]).toBe('yt: next video')
+  expect(await loop()).toMatch(/yt-sweep\S*`/)
+  expect(await loop()).not.toContain('--reset')
 })

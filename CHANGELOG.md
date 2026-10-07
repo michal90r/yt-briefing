@@ -5,6 +5,13 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2026-10-07
+
+### Changed
+- **Remote `/yt` no longer prints its instructions in the chat.** Each briefing request shows as
+  the one line `yt: next video`; what the model must do (the engine command, "summary verbatim")
+  rides in the system prompt only while the loop runs.
+
 ## [1.2.4] - 2026-10-07
 
 ### Fixed
