@@ -5,6 +5,13 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-10-25
+
+### Fixed
+- **`/yt` summaries no longer end with an unrequested credibility section.** The model sometimes
+  added its own "reliability notes" on sourcing and bias. The prompt now forbids it; a channel
+  directive that asks to scrutinize claims still gets its labeled assessment.
+
 ## [1.3.0] - 2026-10-07
 
 ### Changed

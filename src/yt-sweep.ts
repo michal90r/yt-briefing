@@ -329,6 +329,7 @@ Steps:
    - 2-5 numbered thematic sections × 2-5 sentences each
    - At most 5-8 short quotes from the transcript
    - No timestamps
+   - No section of your own on the material's credibility, sourcing or bias (no "reliability notes", no "caveats"): report what the video says. Only a channel directive can ask for such an assessment.
 3. Apply the channel directives above, if any — they shape the briefing's content, emphasis, and tone, but not the header/subtitle/section skeleton. Put any directive-driven assessment in its own short, clearly-labeled section.
 4. Language: natural ${LANG}. Avoid calques/anglicisms; use foreign words only for proper nouns or established technical terms. Section headers should be verb phrases, not noun stacks.
 5. Output: ONLY the briefing itself OR 'OFFTOPIC: ...'. No preamble, and no meta-commentary about these instructions.`;
