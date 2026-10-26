@@ -61,6 +61,7 @@ export const REST_FILE = join(CACHE_DIR, 'queue-rest.json');
 export const PENDING_FILE = join(CACHE_DIR, 'pending.json');
 export const PREFETCH_FILE = join(CACHE_DIR, 'prefetch.json');
 export const LOG_FILE = join(CACHE_DIR, 'sweep.log');
+export const VIDEO_DATES_FILE = join(CACHE_DIR, 'video-dates.json'); // videoId → publishedAt, for the monotonic pointer
 
 // /yt-search (ad-hoc topic search → lazy triage → compare). All throwaway, under .cache/.
 export const SEARCH_QUEUE_FILE = join(CACHE_DIR, 'search-queue.json');     // ranked candidates + cursor

@@ -20,6 +20,7 @@ import { loadEnv } from './lib/env.ts';
 import { parseState } from './lib/yt-lib.ts';
 import { STATE_MD } from './lib/paths.ts';
 import { fetchChannelVideos, type Video } from './lib/yt-api.ts';
+import { loadVideoDates, rememberVideoDates } from './lib/video-dates.ts';
 
 loadEnv();
 
@@ -59,6 +60,10 @@ try {
   console.error((e as Error).message);
   process.exit(1);
 }
+// Date cache read before this listing is added, so a pointer that left the window still has its
+// old date; then every listed video (the pointer too) is remembered for the monotonic bump.
+const videoDates = loadVideoDates();
+rememberVideoDates(videos);
 
 const pointerByType: Record<'longform' | 'short' | 'live', string | null> = {
   longform: row.last_longform_id,
@@ -91,10 +96,12 @@ for (const type of ['longform', 'short', 'live'] as const) {
 
   // normal: find pointer's publishedAt, take everything strictly newer
   const pointerVideo = ofType.find(v => v.videoId === pointerId);
+  // Pointer not in the fetched window: older than the lookback, or deleted/unlisted. Its date
+  // from the sweep's cache keeps already-seen videos out; without one, take the whole window.
+  const cachedTs = Date.parse(videoDates[pointerId] ?? '');
   const cutoffTs = pointerVideo
     ? new Date(pointerVideo.publishedAt).getTime()
-    : // pointer not in fetched window (older than --since cutoff) — take all videos of this type from response
-      -Infinity;
+    : Number.isFinite(cachedTs) ? cachedTs : -Infinity;
 
   for (const v of ofType) {
     if (new Date(v.publishedAt).getTime() <= cutoffTs) continue;

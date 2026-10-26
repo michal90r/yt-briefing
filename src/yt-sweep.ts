@@ -52,7 +52,8 @@
 import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, renameSync, appendFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { loadEnv, missingEnv, missingEnvMessage, REQUIRED_YOUTUBE } from './lib/env.ts';
-import { parseChannels, parseState, bumpStatePointer, isResolved } from './lib/yt-lib.ts';
+import { parseChannels, parseState, bumpStatePointer, isResolved, pointerFor, pointerWouldRegress } from './lib/yt-lib.ts';
+import { loadVideoDates, rememberVideoDates } from './lib/video-dates.ts';
 import { chat, claudeMissing } from './lib/llm.ts';
 import { outputLang } from './lib/config.ts';
 import {
@@ -98,7 +99,7 @@ interface QueueItem {
 }
 type ItemType = QueueItem['type'];
 interface ChannelRef { handle: string; profile_path: string; }
-interface SkipRef { channel: string; type: ItemType; videoId: string; title: string; reason: string; }
+interface SkipRef { channel: string; type: ItemType; videoId: string; title: string; reason: string; publishedAt?: string; }
 /**
  * Lazy queue. `channels_todo` are channels not yet expanded; `items` are expanded, kept
  * videos awaiting a rating; `seen` are videoIds already resolved this run. The foreground
@@ -140,9 +141,13 @@ function run(cmd: string[]): Promise<{ stdout: string; code: number }> {
 
 // ---------- state mutation (inline, crash-safe per write) ----------
 
-function bumpState(handle: string, type: QueueItem['type'], videoId: string): void {
+function bumpState(handle: string, type: QueueItem['type'], videoId: string, publishedAt?: string): void {
   const before = readFileSync(STATE_MD, 'utf8');
-  const after = bumpStatePointer(before, handle, type, videoId, today);
+  const pointer = pointerFor(parseState(before).find(r => r.handle === handle), type);
+  // Never rewind: re-bump the current pointer instead, so the day's session still counts.
+  const regress = pointer !== null && pointerWouldRegress(pointer, videoId, publishedAt, loadVideoDates());
+  if (regress) log(`pointer kept ${handle} ${type} ${pointer} (not rewound to older ${videoId})`);
+  const after = bumpStatePointer(before, handle, type, regress ? pointer! : videoId, today);
   if (after !== before) writeFileSync(STATE_MD, after, 'utf8');
 }
 
@@ -151,22 +156,25 @@ function bumpState(handle: string, type: QueueItem['type'], videoId: string): vo
  * later → retry on the next run); every other skip advances it.
  */
 function persistSkip(item: QueueItem, status: 'content_skip' | 'no_transcript'): void {
-  if (status !== 'no_transcript') bumpState(item.channel, item.type, item.videoId);
+  if (status !== 'no_transcript') bumpState(item.channel, item.type, item.videoId, item.publishedAt);
 }
 
 /**
- * Apply title-skips to state.md. Always bumps the pointer (a title-skip is final).
+ * Apply title-skips to state.md. Bumps the pointer (a title-skip is final) unless that would
+ * rewind it: a background fill's skips are listed against the pointer it saw when it started.
  * Idempotent — re-applying the same skip is a no-op. ONLY the foreground calls this.
  */
 function applyTitleSkips(skips: SkipRef[]): void {
+  rememberVideoDates(skips);
   for (const s of skips) {
-    bumpState(s.channel, s.type, s.videoId);
+    bumpState(s.channel, s.type, s.videoId, s.publishedAt);
     recordSkip({ stage: 'title', channel: s.channel, videoId: s.videoId, title: s.title, reason: s.reason || 'title filter' });
   }
 }
 
 /** Append items, skipping any videoId already queued OR already resolved (seen). */
 function enqueue(queue: Queue, add: QueueItem[]): void {
+  rememberVideoDates(add);
   const have = new Set<string>([...queue.items.map(i => i.videoId), ...queue.seen]);
   for (const it of add) if (!have.has(it.videoId)) { queue.items.push(it); have.add(it.videoId); }
 }
@@ -378,7 +386,7 @@ async function expandChannel(ref: ChannelRef): Promise<{ items: QueueItem[]; ski
   const items: QueueItem[] = [];
   const skips: SkipRef[] = [];
   for (const it of candidates) {
-    if (titleSkip.has(it.videoId)) skips.push({ channel: it.channel, type: it.type, videoId: it.videoId, title: it.title, reason: titleSkip.get(it.videoId) || 'title filter' });
+    if (titleSkip.has(it.videoId)) skips.push({ channel: it.channel, type: it.type, videoId: it.videoId, title: it.title, reason: titleSkip.get(it.videoId) || 'title filter', publishedAt: it.publishedAt });
     else items.push(it);
   }
   return { items, skips };
@@ -457,10 +465,7 @@ function loadQueue(): Queue | null {
 
 /** state.md pointer for this item's type, or null if the channel has no row yet. */
 function statePointer(item: QueueItem): string | null {
-  const row = parseState(readFileSync(STATE_MD, 'utf8')).find(r => r.handle === item.channel);
-  if (!row) return null;
-  return item.type === 'longform' ? row.last_longform_id
-    : item.type === 'short' ? row.last_short_id : row.last_live_id;
+  return pointerFor(parseState(readFileSync(STATE_MD, 'utf8')).find(r => r.handle === item.channel), item.type);
 }
 
 type ItemResult =

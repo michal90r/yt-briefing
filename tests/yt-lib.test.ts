@@ -5,6 +5,8 @@ import {
   parseChannels,
   parseState,
   bumpStatePointer,
+  pointerWouldRegress,
+  pointerFor,
   isResolved,
   appendToSection,
   appendSkipTitle,
@@ -49,6 +51,32 @@ describe('parseState', () => {
         session: 2,
       },
     ]);
+  });
+});
+
+describe('pointerWouldRegress', () => {
+  const dates = { newer: '2026-10-26T05:00:00Z', older: '2026-09-13T02:00:00Z' };
+
+  it('refuses a known older video once the pointer is on a newer one', () => {
+    expect(pointerWouldRegress('newer', 'older', dates.older, dates)).toBe(true);
+  });
+
+  it('lets the pointer move forward or stay', () => {
+    expect(pointerWouldRegress('older', 'newer', dates.newer, dates)).toBe(false);
+    expect(pointerWouldRegress('newer', 'newer', dates.newer, dates)).toBe(false);
+  });
+
+  it('picks the pointer of the asked type', () => {
+    const row = { handle: '@Foo', last_longform_id: 'lf', last_short_id: 'sh', last_live_id: null } as never;
+    expect(pointerFor(row, 'short')).toBe('sh');
+    expect(pointerFor(row, 'live')).toBeNull();
+    expect(pointerFor(undefined, 'longform')).toBeNull();
+  });
+
+  it('bumps as before when a date is unknown or there is no pointer', () => {
+    expect(pointerWouldRegress('unknown', 'older', dates.older, dates)).toBe(false);
+    expect(pointerWouldRegress('newer', 'older', undefined, dates)).toBe(false);
+    expect(pointerWouldRegress(null, 'older', dates.older, dates)).toBe(false);
   });
 });
 

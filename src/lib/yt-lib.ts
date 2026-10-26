@@ -65,6 +65,29 @@ export function bumpStateFrontmatterDate(content: string, date: string): string 
   return content.replace(/^updated:\s*\d{4}-\d{2}-\d{2}/m, `updated: ${date}`);
 }
 
+/** The state pointer of one type for a channel row (null when unset or the row is missing). */
+export function pointerFor(row: StateRow | undefined, type: 'longform' | 'short' | 'live'): string | null {
+  if (!row) return null;
+  return type === 'longform' ? row.last_longform_id : type === 'short' ? row.last_short_id : row.last_live_id;
+}
+
+/**
+ * Would moving the pointer from `pointerId` to `videoId` move it back in time? `dates` maps
+ * videoIds to publishedAt. Unknown dates answer false (bump as before): only a known older
+ * video is refused. A stale skip applied after the pointer moved on used to rewind it, and
+ * the next queue listed already-rated videos again.
+ */
+export function pointerWouldRegress(
+  pointerId: string | null,
+  videoId: string,
+  publishedAt: string | undefined,
+  dates: Record<string, string>,
+): boolean {
+  if (!pointerId || pointerId === videoId || !publishedAt) return false;
+  const at = dates[pointerId];
+  return !!at && Date.parse(at) > Date.parse(publishedAt);
+}
+
 /**
  * Per-video pointer bump. Updates one type's last_id for one channel.
  * Session counter increments only on first touch of the day (updated != date).

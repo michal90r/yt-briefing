@@ -28,7 +28,8 @@ import { spawn } from 'node:child_process';
 import { loadEnv } from './lib/env.ts';
 import { loadConfig } from './lib/config.ts';
 import { distillComment } from './lib/distill.ts';
-import { parseChannels, appendSkipTitle, appendNote, bumpStatePointer, type ChannelEntry } from './lib/yt-lib.ts';
+import { parseChannels, parseState, appendSkipTitle, appendNote, bumpStatePointer, pointerFor, pointerWouldRegress, type ChannelEntry } from './lib/yt-lib.ts';
+import { loadVideoDates } from './lib/video-dates.ts';
 import { CHANNELS_MD, STATE_MD, PENDING_FILE, QUEUE_FILE, profilePath } from './lib/paths.ts';
 
 loadEnv();
@@ -55,7 +56,7 @@ function getArg(args: string[], name: string): string | null {
  * Video metadata defaults to .cache/pending.json (written by yt-sweep.ts) so the agent
  * only needs to pass --rating (+ optional --comment). Explicit flags still override.
  */
-function loadPending(): Partial<{ channel: string; videoId: string; title: string; type: string; is_baseline: boolean }> {
+function loadPending(): Partial<{ channel: string; videoId: string; title: string; type: string; is_baseline: boolean; publishedAt: string }> {
   if (!existsSync(PENDING_FILE)) return {};
   try { return JSON.parse(readFileSync(PENDING_FILE, 'utf8')); } catch { return {}; }
 }
@@ -141,7 +142,14 @@ if (profileAfter !== profileBefore) {
 let stateBumped = false;
 if (!args.noState) {
   const stateBefore = readFileSync(STATE_MD, 'utf8');
-  const stateAfter = bumpStatePointer(stateBefore, args.channel, args.type, args.id, date);
+  // An older video rated after a newer one of the same channel was title-skipped must not
+  // rewind the pointer; the date comes from the sweep's cache of listed videos.
+  const pointer = pointerFor(parseState(stateBefore).find(r => r.handle === args.channel), args.type);
+  const dates = loadVideoDates();
+  const publishedAt = dates[args.id] ?? (() => { const p = loadPending(); return p.videoId === args.id ? p.publishedAt : undefined; })();
+  // Never rewind: re-bump the current pointer instead, so the day's session still counts.
+  const regress = pointer !== null && pointerWouldRegress(pointer, args.id, publishedAt, dates);
+  const stateAfter = bumpStatePointer(stateBefore, args.channel, args.type, regress ? pointer! : args.id, date);
   if (stateAfter !== stateBefore) {
     writeFileSync(STATE_MD, stateAfter, 'utf8');
     stateBumped = true;

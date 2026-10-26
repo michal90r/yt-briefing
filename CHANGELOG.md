@@ -5,6 +5,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2026-10-26
+
+### Fixed
+- **Already-rated videos no longer come back.** A state pointer could move back in time: title
+  skips from the background fill were listed against the pointer the fill saw when it started,
+  and the foreground applied them after the pointer had moved on. The next queue then listed every
+  video after the older skip, so one channel served a month of rated shorts again. The sweep now
+  remembers each listed video's publish date and refuses to move a pointer to an older video, in
+  the sweep and in `yt-rating`. When the pointer video drops out of the channel listing (older
+  than the lookback, deleted or unlisted), its remembered date is the cutoff instead of taking the
+  whole 45-day window.
+
 ## [1.3.2] - 2026-10-26
 
 ### Fixed
