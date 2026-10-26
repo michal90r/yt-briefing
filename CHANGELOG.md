@@ -5,6 +5,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **The rating dialog opens right after the summary.** After each briefing turn the plugin runs
+  the sweep again to open the dialog, and the sweep fetched the transcript and summarized the same
+  video a second time: 16 s on a short video, over a minute on a long one, with a different
+  summary each time. The sweep now keeps the summary it emitted and returns it at once.
+- **The prepared next video is no longer thrown away.** The loop instructions in the system prompt
+  could stay as first composed, so every turn ran the sweep with `--reset` and discarded the next
+  video warmed in the background. The instructions are now the same on every turn, and only the
+  first prompt of a run (`yt: first video`) asks for `--reset`.
+
 ## [1.3.1] - 2026-10-25
 
 ### Fixed

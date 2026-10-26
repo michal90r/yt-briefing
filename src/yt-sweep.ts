@@ -29,7 +29,8 @@
  *                                      rating) + `seen`. Foreground is the SOLE writer.
  *                                      Tagged with built_at; auto-rebuilt on a new day or via --reset.
  *   - <DATA_DIR>/.cache/queue-rest.json  background-fill handoff written by the --fill child.
- *   - <DATA_DIR>/.cache/pending.json   current ratable video's metadata for yt-rating.ts.
+ *   - <DATA_DIR>/.cache/pending.json   current ratable video's metadata for yt-rating.ts, plus its
+ *                                      emitted summary so a repeat sweep returns it unchanged.
  *   - <DATA_DIR>/.cache/prefetch.json  background-computed summary for the NEXT video.
  *
  *   All .cache/ files are throwaway (rebuilt each run; safe to delete / gitignore).
@@ -180,20 +181,30 @@ function dropHead(queue: Queue): void {
 
 interface Prefetch { videoId: string; summary: string; built_at: string; }
 
-function loadPrefetch(videoId: string): string | null {
-  if (!existsSync(PREFETCH_FILE)) return null;
+/**
+ * A summary cached today for `videoId` in `file`: prefetch.json (the warmed next video) or
+ * pending.json (the head already emitted, so a repeat sweep returns it at once and unchanged).
+ */
+function loadCachedSummary(file: string, videoId: string): string | null {
+  if (!existsSync(file)) return null;
   try {
-    const p = JSON.parse(readFileSync(PREFETCH_FILE, 'utf8')) as Prefetch;
-    if (p.videoId === videoId && p.built_at === today) return p.summary;
+    const p = JSON.parse(readFileSync(file, 'utf8')) as Partial<Prefetch>;
+    if (p.videoId === videoId && p.built_at === today && p.summary) return p.summary;
   } catch { /* corrupt → ignore */ }
   return null;
 }
 
+const loadPrefetch = (videoId: string) => loadCachedSummary(PREFETCH_FILE, videoId);
+
 /** Atomic write (temp + rename) so a concurrent reader never sees a partial file. */
+function writeAtomic(file: string, value: unknown): void {
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(value));
+  renameSync(tmp, file);
+}
+
 function writePrefetch(p: Prefetch): void {
-  const tmp = `${PREFETCH_FILE}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(p));
-  renameSync(tmp, PREFETCH_FILE);
+  writeAtomic(PREFETCH_FILE, p);
 }
 
 function clearPrefetch(): void {
@@ -493,9 +504,11 @@ async function advance(queue: Queue): Promise<never> {
     // `seen`) → drop. The `seen` arm survives a --fill pointer-regression race (isResolved).
     if (isResolved(statePointer(item), item.videoId, queue.seen)) { dropHead(queue); continue; }
 
-    // Warm prefetch from the background child? Use it and skip the live fetch + content filter.
-    const cached = loadPrefetch(item.videoId);
-    if (cached) log(`prefetch hit ${item.videoId}`);
+    // Already emitted (the plugin re-runs the sweep after the briefing turn to open the rating
+    // dialog) or warmed by the background child? Use it and skip the live fetch + content filter.
+    const emitted = loadCachedSummary(PENDING_FILE, item.videoId);
+    const cached = emitted ?? loadPrefetch(item.videoId);
+    if (cached) log(`${emitted ? 'pending' : 'prefetch'} hit ${item.videoId}`);
     const result: ItemResult = cached
       ? { kind: 'ratable', summary: cached }
       : await processItem(item);
@@ -521,10 +534,11 @@ async function advance(queue: Queue): Promise<never> {
       channel: item.channel, videoId: item.videoId, title: item.title,
       type: item.type, publishedAt: item.publishedAt, is_baseline: item.is_baseline,
     };
-    writeFileSync(PENDING_FILE, JSON.stringify(pending));
+    writeAtomic(PENDING_FILE, { ...pending, summary: result.summary, built_at: today });
     writeFileSync(QUEUE_FILE, JSON.stringify(queue));
-    // Warm the NEXT video in the background while the user rates this one.
-    spawnPrefetch(queue.items[1]);
+    // Warm the NEXT video in the background while the user rates this one. A repeat emit of the
+    // same head already spawned that child; a second one would summarize the next video twice.
+    if (!emitted) spawnPrefetch(queue.items[1]);
     emit({ status: 'rating_needed', summary: result.summary, pending, lang: LANG });
   }
 

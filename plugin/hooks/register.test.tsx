@@ -59,10 +59,12 @@ test('/yt runs in the chat: each briefing is a chat turn and the rating dialog f
   const out = await $.command.run(YT)
   expect(out.text).toContain('runs in the chat')
   await until(() => log.submitted.length > 0)
-  expect(log.submitted).toEqual(['yt: next video'])
+  expect(log.submitted).toEqual(['yt: first video'])
   const loop = async () => (await $.prompt.compose(COMPOSE)).sections.find(x => x.id === 'yt-briefing:loop')?.text ?? ''
-  expect(await loop()).toMatch(/yt-sweep\S* --reset/)
-  expect(await loop()).toContain('verbatim')
+  const first = await loop()
+  expect(first).toMatch(/"yt: first video" run `[^`]*yt-sweep\S* --reset`/)
+  expect(first).toMatch(/"yt: next video" run `[^`]*yt-sweep\S*`/)
+  expect(first).toContain('verbatim')
   expect(asked).toEqual([])
 
   await $.turn.complete({ answer: 'the summary', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
@@ -73,6 +75,6 @@ test('/yt runs in the chat: each briefing is a chat turn and the rating dialog f
   expect(ratings).toHaveLength(1)
   expect(ratings[0]).toEqual(expect.arrayContaining(['--rating', '1']))
   expect(log.submitted[1]).toBe('yt: next video')
-  expect(await loop()).toMatch(/yt-sweep\S*`/)
-  expect(await loop()).not.toContain('--reset')
+  // The instructions never change between turns; only the submitted text says "start over".
+  expect(await loop()).toBe(first)
 })

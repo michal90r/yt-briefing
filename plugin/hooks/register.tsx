@@ -79,26 +79,28 @@ const STRAY_TAP_MS = 1500
 
 const CHOICES = ['OK', 'Weak', 'Research', 'Stop'] as const
 
-/** What a briefing turn must do, read from the system prompt while the loop runs. */
-function loopSection(reset: boolean): string {
-  const sweep = [...engine('yt-sweep'), ...(reset ? ['--reset'] : [])].join(' ')
+/** What the chat shows of each briefing prompt; the instructions ride along as unseen context. */
+const NEXT_TEXT = 'yt: next video'
+/** The first prompt of a /yt run: the only one that rebuilds the queue. */
+const FIRST_TEXT = 'yt: first video'
+
+/**
+ * What a briefing turn must do, read from the system prompt while the loop runs. The text is the
+ * same for every turn: a session-scoped section may be kept as first composed, so a per-turn
+ * `--reset` here once stuck to every turn and threw away the warmed next video each time.
+ */
+function loopSection(): string {
+  const sweep = engine('yt-sweep').join(' ')
   return [
-    `The yt-briefing plugin is running the person's YouTube briefing. A user message reading exactly "${NEXT_TEXT}" is its request for the next video:`,
-    `run \`${sweep}\`; it prints one JSON line. If \`status\` is \`rating_needed\`, answer with \`summary\` verbatim as your whole message, Markdown kept: nothing before or after it, no question, no tool call after it (the plugin opens the rating dialog itself).`,
+    `The yt-briefing plugin is running the person's YouTube briefing. A user message reading exactly "${FIRST_TEXT}" or "${NEXT_TEXT}" is its request for the next video:`,
+    `for "${FIRST_TEXT}" run \`${sweep} --reset\`, for "${NEXT_TEXT}" run \`${sweep}\`; it prints one JSON line. If \`status\` is \`rating_needed\`, answer with \`summary\` verbatim as your whole message, Markdown kept: nothing before or after it, no question, no tool call after it (the plugin opens the rating dialog itself).`,
     'Otherwise answer with one short line saying why there is nothing to rate. Write in the language of the summaries.',
   ].join('\n')
 }
 
-/** What the chat shows of each briefing prompt; the instructions ride along as unseen context. */
-const NEXT_TEXT = 'yt: next video'
-
-/** Whether the next briefing prompt starts a fresh sweep. */
-let resetNext = false
-
 /** Ask for a briefing once the hook that wants it has answered: one submitted from inside would wait on it. */
 function submitLater($: EngineInterface, reset: boolean) {
-  resetNext = reset
-  $.clock.after(0, () => void $.prompt.submit({ text: NEXT_TEXT, asUser: true }).catch(err => {
+  $.clock.after(0, () => void $.prompt.submit({ text: reset ? FIRST_TEXT : NEXT_TEXT, asUser: true }).catch(err => {
     looping = false
     $.ui.toast(`Could not continue the briefing: ${String(err)}`)
   }))
@@ -176,7 +178,7 @@ export const register: Register = on => {
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
     if (!looping) return composed
-    return { sections: [...composed.sections, { id: 'yt-briefing:loop', text: loopSection(resetNext), scope: 'session' as const }] }
+    return { sections: [...composed.sections, { id: 'yt-briefing:loop', text: loopSection(), scope: 'session' as const }] }
   })
 
   on('turn.complete', async ($, e, next) => {
