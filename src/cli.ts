@@ -10,6 +10,7 @@
  *   yt-briefing add|remove <@handle|url>   add or remove channels (also list)
  *   yt-briefing list                       list the channels you follow
  *   yt-briefing sweep [--reset]            advance one step; prints a JSON status line
+ *   yt-briefing sweep --pending            read-only: the video already shown and not yet rated
  *   yt-briefing rate --rating 0|1 [...]    record a rating for the pending video
  *   yt-briefing transcribe <url|id>        print a single video's transcript
  *   yt-briefing search "<intent>" --channel <@handle|url>   search within one channel → triage → compare

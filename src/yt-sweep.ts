@@ -8,12 +8,14 @@
  *
  * Usage:
  *   bun src/yt-sweep.ts [--reset]
+ *   bun src/yt-sweep.ts --pending              (read-only: the video already emitted, still unrated)
  *   bun src/yt-sweep.ts --prefetch <videoId>   (internal: detached next-video warmup)
  *   bun src/yt-sweep.ts --fill                 (internal: detached queue builder)
  *
  * Output (stdout, single JSON line):
  *   {"status":"rating_needed","summary":"<md>","pending":{channel,videoId,title,type,publishedAt,is_baseline}}  (+ "lang")
  *   {"status":"done"}
+ *   {"status":"no_pending"}  (--pending only: no emitted video awaits a rating)
  *   {"status":"rate_limited"}
  *
  * The engine ONLY writes files under DATA_DIR — it never runs git or any VCS. If you
@@ -76,6 +78,7 @@ const CONCURRENCY = 6;
 const argv = process.argv.slice(2);
 const reset = argv.includes('--reset');
 const fillMode = argv.includes('--fill');
+const pendingMode = argv.includes('--pending');
 const pfIdx = argv.indexOf('--prefetch');
 const prefetchTarget = pfIdx !== -1 ? argv[pfIdx + 1]! : null;
 const today = new Date().toISOString().slice(0, 10);
@@ -497,6 +500,14 @@ async function processItem(item: QueueItem): Promise<ItemResult> {
   return { kind: 'ratable', summary };
 }
 
+/** The video's metadata as `rating_needed` reports it and yt-rating reads it from pending.json. */
+function pendingOf(item: QueueItem) {
+  return {
+    channel: item.channel, videoId: item.videoId, title: item.title,
+    type: item.type, publishedAt: item.publishedAt, is_baseline: item.is_baseline,
+  };
+}
+
 async function advance(queue: Queue): Promise<never> {
   while (true) {
     // Pull in the background fill (or expand a channel ourselves) until there's an
@@ -509,8 +520,8 @@ async function advance(queue: Queue): Promise<never> {
     // `seen`) → drop. The `seen` arm survives a --fill pointer-regression race (isResolved).
     if (isResolved(statePointer(item), item.videoId, queue.seen)) { dropHead(queue); continue; }
 
-    // Already emitted (the plugin re-runs the sweep after the briefing turn to open the rating
-    // dialog) or warmed by the background child? Use it and skip the live fetch + content filter.
+    // Already emitted (a repeat sweep before the rating) or warmed by the background child? Use it
+    // and skip the live fetch + content filter.
     const emitted = loadCachedSummary(PENDING_FILE, item.videoId);
     const cached = emitted ?? loadPrefetch(item.videoId);
     if (cached) log(`${emitted ? 'pending' : 'prefetch'} hit ${item.videoId}`);
@@ -535,10 +546,7 @@ async function advance(queue: Queue): Promise<never> {
 
     // Ratable — hand off to the frontend. Leave item at queue head (rating bumps state,
     // next call detects pointer === videoId and drops it).
-    const pending = {
-      channel: item.channel, videoId: item.videoId, title: item.title,
-      type: item.type, publishedAt: item.publishedAt, is_baseline: item.is_baseline,
-    };
+    const pending = pendingOf(item);
     writeAtomic(PENDING_FILE, { ...pending, summary: result.summary, built_at: today });
     writeFileSync(QUEUE_FILE, JSON.stringify(queue));
     // Warm the NEXT video in the background while the user rates this one. A repeat emit of the
@@ -552,6 +560,22 @@ async function advance(queue: Queue): Promise<never> {
   clearRest();
   clearPrefetch();
   emit({ status: 'done' });
+}
+
+/**
+ * --pending mode: the video the sweep already emitted, if it still awaits a rating. The plugin asks
+ * this after a briefing turn to open the rating dialog. Read-only and offline on purpose: a real
+ * sweep there rebuilt the queue once `done` had removed it, and the dialog then asked about a new
+ * video the chat never showed.
+ */
+function runPending(): never {
+  const queue = loadQueue();
+  const head = queue?.items[0];
+  const summary = head && loadCachedSummary(PENDING_FILE, head.videoId);
+  if (!queue || !head || !summary || isResolved(statePointer(head), head.videoId, queue.seen)) {
+    emit({ status: 'no_pending' });
+  }
+  emit({ status: 'rating_needed', summary, pending: pendingOf(head), lang: LANG });
 }
 
 /**
@@ -607,6 +631,9 @@ if (prefetchTarget) {
 }
 if (fillMode) {
   await runFill();                     // detached background queue builder — never returns
+}
+if (pendingMode) {
+  runPending();                        // read-only answer for the rating dialog — never returns
 }
 if (reset) {
   if (existsSync(QUEUE_FILE)) rmSync(QUEUE_FILE);

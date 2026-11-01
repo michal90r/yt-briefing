@@ -38,6 +38,10 @@ line on stdout (stderr stays empty, so callers never redirect to a temp file):
 - `{"status":"error","error":"…"}` — setup/config problem (e.g. missing
   `YT_BRIEFING_YOUTUBE_API_KEY`); the skill surfaces `error` verbatim and stops.
 
+`yt-sweep --pending` is the read-only exception: offline, no queue work. It repeats the video
+already emitted while it awaits a rating, or answers `{"status":"no_pending"}`. The plugin uses it
+to open the rating dialog.
+
 The `/yt` skill (`.claude/skills/yt/SKILL.md`) is a thin loop over exactly this: paste the
 summary, collect the rating, repeat. `yt-rating` is the only thing that writes a rating;
 everything else lives inside `yt-sweep`.

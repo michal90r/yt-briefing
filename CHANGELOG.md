@@ -5,6 +5,21 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] - 2026-11-01
+
+### Fixed
+- **The end of a briefing is the end.** After the last video the chat said there was nothing left,
+  and then a rating dialog opened for a video the chat never showed. After every briefing turn the
+  plugin ran a real sweep to open the dialog. Once `done` had removed the queue, that sweep built a
+  new one and picked up anything published since the run started. The plugin now asks a new
+  read-only `yt-sweep --pending`, so the dialog opens only for the video the chat just showed and
+  only while it is unrated. The same guard covers a turn that ended on `rate_limited` or
+  `tooling_error`. A video published during a run waits for the next `/yt`. Run
+  `npx yt-briefing install-skill` after updating, because the fix is partly in the installed plugin.
+- **A failed rating step says why.** If the engine cannot answer after a briefing, a toast names the
+  error instead of the loop ending in silence. The sweep prompt also asks for a 10-minute foreground
+  call, so a slow first video no longer hits the default shell timeout.
+
 ## [1.3.3] - 2026-10-26
 
 ### Fixed
@@ -505,6 +520,7 @@ after upgrading. Your channels, profiles and ratings carry over unchanged.
 - Initial public release. Cross-runtime engine (Node 18+ and Bun, any package manager),
   the consume-as-a-dependency model, and the `/yt` skill with its installer.
 
+[1.3.4]: https://github.com/michal90r/yt-briefing/compare/v1.3.3...v1.3.4
 [0.15.1]: https://github.com/michal90r/yt-briefing/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/michal90r/yt-briefing/compare/v0.14.2...v0.15.0
 [0.14.2]: https://github.com/michal90r/yt-briefing/compare/v0.14.1...v0.14.2

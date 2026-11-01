@@ -74,7 +74,42 @@ test('/yt runs in the chat: each briefing is a chat turn and the rating dialog f
   const ratings = calls.filter(c => c.some(a => a.includes('yt-rating')))
   expect(ratings).toHaveLength(1)
   expect(ratings[0]).toEqual(expect.arrayContaining(['--rating', '1']))
+  // The dialog only ever reads the video already shown; a real sweep could fetch a new one.
+  const sweeps = calls.filter(c => c.some(a => a.includes('yt-sweep')))
+  expect(sweeps.length).toBeGreaterThan(0)
+  for (const sweep of sweeps) expect(sweep).toContain('--pending')
   expect(log.submitted[1]).toBe('yt: next video')
   // The instructions never change between turns; only the submitted text says "start over".
   expect(await loop()).toBe(first)
+})
+
+test('a turn with nothing left to rate ends the loop without a dialog', async ($, on) => {
+  const asked: string[] = []
+  const calls: string[][] = []
+  const log = newLog()
+  host(on, log)
+  on('process.run', async (_$, e) => {
+    calls.push([...e.argv])
+    return ran('{"status":"no_pending"}')
+  })
+  on('tool.call', { tool: 'AskUserQuestion' }, async (_$, e) => {
+    const { questions } = e as unknown as { questions: { question: string }[] }
+    asked.push(questions[0].question)
+    return { result: { questions, answers: { [questions[0].question]: 'OK' } } } as never
+  })
+  const until = async (ok: () => boolean) => { for (let i = 0; i < 100 && !ok(); i++) await new Promise(r => setTimeout(r, 30)) }
+
+  await $.command.run(YT)
+  await until(() => log.submitted.length > 0)
+  await $.turn.complete({ answer: 'Nothing left to rate.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  await until(() => calls.length > 0)
+  await new Promise(r => setTimeout(r, 100))
+
+  expect(calls[0]).toContain('--pending')
+  expect(asked).toEqual([])
+  expect(log.submitted).toEqual(['yt: first video'])
+  // The loop is over: a later turn asks the engine nothing.
+  await $.turn.complete({ answer: 'something else', durationMs: 1, isAborted: false, turnId: 't2', reason: 'answer' } as never)
+  await new Promise(r => setTimeout(r, 100))
+  expect(calls).toHaveLength(1)
 })

@@ -8,8 +8,10 @@ import { engine } from './engine.ts'
 // a phone; the rating dialog opens once that turn has ended. Ratings and comments are written by
 // the engine, never by this module.
 
-/** A sweep can expand channels, fetch transcripts and summarize; give it the engine's full budget. */
+/** A sweep can expand channels, fetch transcripts and summarize; the model's call gets this budget. */
 const SWEEP_MS = 10 * 60_000
+/** Local files only, no network. */
+const PENDING_MS = 30_000
 /** A rating is a file write; a raw comment adds one `claude -p` call to distill it. */
 const RATE_MS = 3 * 60_000
 
@@ -26,9 +28,9 @@ function parseOut(stdout: string): SweepOut {
   return JSON.parse(line) as SweepOut
 }
 
-/** One engine sweep: the next ratable video, or the end state. Throws when the engine does not answer. */
-async function runSweep($: EngineInterface): Promise<SweepOut> {
-  const run = await $.process.run(engine('yt-sweep'), { timeoutMs: SWEEP_MS })
+/** The video this run already showed and not yet rated. Never a real sweep: that could fetch a new one. */
+async function shownVideo($: EngineInterface): Promise<SweepOut> {
+  const run = await $.process.run([...engine('yt-sweep'), '--pending'], { timeoutMs: PENDING_MS })
   return parseOut(run.stdout)
 }
 
@@ -93,7 +95,7 @@ function loopSection(): string {
   const sweep = engine('yt-sweep').join(' ')
   return [
     `The yt-briefing plugin is running the person's YouTube briefing. A user message reading exactly "${FIRST_TEXT}" or "${NEXT_TEXT}" is its request for the next video:`,
-    `for "${FIRST_TEXT}" run \`${sweep} --reset\`, for "${NEXT_TEXT}" run \`${sweep}\`; it prints one JSON line. If \`status\` is \`rating_needed\`, answer with \`summary\` verbatim as your whole message, Markdown kept: nothing before or after it, no question, no tool call after it (the plugin opens the rating dialog itself).`,
+    `for "${FIRST_TEXT}" run \`${sweep} --reset\`, for "${NEXT_TEXT}" run \`${sweep}\`, in the foreground with a ${SWEEP_MS / 60_000}-minute timeout; it prints one JSON line. If \`status\` is \`rating_needed\`, answer with \`summary\` verbatim as your whole message, Markdown kept: nothing before or after it, no question, no tool call after it (the plugin opens the rating dialog itself).`,
     'Otherwise answer with one short line saying why there is nothing to rate. Write in the language of the summaries.',
   ].join('\n')
 }
@@ -110,9 +112,10 @@ function submitLater($: EngineInterface, reset: boolean) {
 async function rateAfterTurn($: EngineInterface) {
   let out: SweepOut
   try {
-    out = await runSweep($)
-  } catch {
+    out = await shownVideo($)
+  } catch (err) {
     looping = false
+    $.ui.toast(`Could not open the rating: ${String(err).slice(0, 200)}`)
     return
   }
   if (out.status !== 'rating_needed' || !out.pending || !out.summary) {
